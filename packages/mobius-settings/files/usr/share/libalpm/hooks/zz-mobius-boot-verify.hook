@@ -1,0 +1,12 @@
+# Runs last: confirm every installed kernel actually landed on the EFI partition.
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Target = usr/lib/modules/*/vmlinuz
+Target = usr/lib/initcpio/*
+
+[Action]
+Description = Mobius: verifying kernels on /boot...
+When = PostTransaction
+Exec = /usr/lib/mobius/boot-guard post

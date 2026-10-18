@@ -1,0 +1,27 @@
+# The Mobius base system on top of Arch's "base".
+pkgname=mobius-base
+pkgver=2026.10.18
+pkgrel=1
+pkgdesc='Mobius Linux base: kernel, boot, snapshots, tuning, networking, tools, Claude'
+arch=('any')
+license=('MIT')
+depends=(
+  base base-devel linux-firmware amd-ucode
+  linux-mobius linux-mobius-headers
+  mobius-settings
+  # Boot + snapshots (Limine, btrfs, snapper; snapshot boot entries like CachyOS)
+  limine efibootmgr btrfs-progs snapper snap-pac limine-snapper-sync limine-mkinitcpio-hook btrfs-assistant
+  # Networking
+  networkmanager tailscale openssh
+  # Shell and everyday tools
+  fish git nano sudo man-db man-pages htop btop jq bc wget curl rsync
+  smartmontools ntfs-3g exfatprogs dosfstools
+  # AUR helper (built from source)
+  paru
+  # Containers / apps
+  flatpak
+  # Claude
+  claude-code claude-desktop bubblewrap socat ripgrep
+)
+
+package() { :; }

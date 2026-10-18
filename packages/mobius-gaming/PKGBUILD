@@ -1,0 +1,29 @@
+# Everything CachyOS ships for gaming, from Arch repos plus a few rebuilt AUR packages.
+pkgname=mobius-gaming
+pkgver=2026.10.18
+pkgrel=2
+pkgdesc='Mobius Linux gaming stack: Steam, Proton-GE, Lutris, Wine, GameMode, MangoHud, gamescope, RADV'
+arch=('any')
+license=('MIT')
+depends=(
+  # AMD graphics, RADV only (no amdvlk)
+  mesa lib32-mesa vulkan-radeon lib32-vulkan-radeon vulkan-icd-loader lib32-vulkan-icd-loader
+  vulkan-tools mesa-utils
+  # Launchers and runtimes
+  steam lutris umu-launcher protontricks proton-ge-custom-bin
+  wine-staging winetricks wine-mono wine-gecko vkd3d lib32-vkd3d
+  # Wine runtime libs (the optional ones games actually hit)
+  lib32-gnutls lib32-libpulse lib32-alsa-plugins lib32-alsa-lib
+  lib32-libxcomposite lib32-libxinerama lib32-ncurses lib32-opencl-icd-loader
+  lib32-pipewire lib32-sdl3
+  # Performance and overlays
+  gamemode lib32-gamemode mangohud lib32-mangohud gamescope goverlay scx-scheds
+  # GPU monitoring and tuning
+  lact amdgpu_top radeontop
+  # Controllers and HOTAS (jstest for the T.16000M/TWCS)
+  joyutils
+  # Modding tools that came up before (UABEA needs .NET 8)
+  dotnet-runtime-8.0 p7zip unrar unzip
+)
+
+package() { :; }

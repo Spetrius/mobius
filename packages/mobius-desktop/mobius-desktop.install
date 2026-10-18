@@ -1,0 +1,4 @@
+post_install() {
+  echo ":: Enable the login screen with: systemctl enable greetd"
+  echo ":: New users get the Mobius config from /etc/skel. Existing users: mobius-skel-sync"
+}
