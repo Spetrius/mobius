@@ -48,7 +48,12 @@ ask()  { # ask VAR "prompt" default
 }
 in_target() { run arch-chroot "$T" "$@"; }
 
-labels_on() { lsblk -nrpo LABEL "$1" 2>/dev/null | sed 's/\\x20/ /g' | grep -v '^$' || true; }
+labels_on() { # read labels straight from disk (blkid), not from the udev cache
+    local part
+    while IFS= read -r part; do
+        blkid -p -s LABEL -o value "$part" 2>/dev/null || true
+    done < <(lsblk -nrpo NAME "$1" 2>/dev/null)
+}
 
 refuse_if_protected() { # $1 = block device (disk or partition)
     local lbl p
@@ -59,7 +64,13 @@ refuse_if_protected() { # $1 = block device (disk or partition)
     done < <(labels_on "$1")
 }
 
-serial_of() { lsblk -dnro SERIAL "$1" 2>/dev/null | head -1; }
+refuse_if_mounted() { # $1 = block device; catches the boot USB and anything in use
+    if lsblk -nro MOUNTPOINTS "$1" 2>/dev/null | grep -q .; then
+        die "$1 (or one of its partitions) is mounted. Pick a disk that isn't in use."
+    fi
+}
+
+serial_of() { [[ -n "$1" ]] || return 0; lsblk -dnro SERIAL "$1" 2>/dev/null | head -1 || true; }
 
 confirm_destroy() { # $1 = device, $2 = what happens
     local dev="$1" ser want
@@ -95,8 +106,9 @@ prepare_fresh() {
     echo; lsblk -dpo NAME,SIZE,MODEL,SERIAL,TRAN | grep -v '^/dev/\(loop\|sr\|zram\)'; echo
     ask MOBIUS_DISK "Disk to ERASE for Mobius (e.g. /dev/sda)"
     local d="$MOBIUS_DISK"
-    [[ -b "$d" && "$(lsblk -dno TYPE "$d")" == disk ]] || die "$d is not a disk"
-    refuse_if_protected "$d"
+    local dtype; dtype="$(lsblk -dno TYPE "$d" 2>/dev/null || true)"
+    [[ "$dtype" == disk || ( -n "${MOBIUS_TEST:-}" && "$dtype" == loop ) ]] || die "$d is not a disk"
+    refuse_if_protected "$d"; refuse_if_mounted "$d"
     confirm_destroy "$d" "EVERYTHING on $d will be erased."
 
     run wipefs -af "$d"
@@ -122,6 +134,7 @@ prepare_reuse() {
     [[ "$(lsblk -no FSTYPE "$ESP")" == vfat ]]  || die "$ESP is not vfat"
     [[ "$(lsblk -no FSTYPE "$ROOT")" == btrfs ]] || die "$ROOT is not btrfs"
     refuse_if_protected "$ESP"; refuse_if_protected "$ROOT"
+    refuse_if_mounted "$ESP"; refuse_if_mounted "$ROOT"
 
     run mount -o subvolid=5 "$ROOT" "$T"
     (( DRY )) || [[ -d "$T/@home" ]] || { umount "$T"; die "no @home subvolume on $ROOT"; }
