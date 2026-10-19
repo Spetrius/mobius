@@ -210,7 +210,15 @@ install_packages() {
     run pacman -Sy --config "$conf"
     local pkgs=(mobius-base mobius-desktop mobius-gaming "${EXTRA_PKGS[@]}")
     [[ -n "${MOBIUS_PKGS:-}" ]] && read -r -a pkgs <<< "$MOBIUS_PKGS"
-    run pacstrap -C "$conf" -K "$T" "${pkgs[@]}"
+    # A stalled mirror fails the download phase before anything is installed, so retrying
+    # is safe; pacman also moves on to the next mirror in the list each time.
+    local attempt
+    for attempt in 1 2 3; do
+        run pacstrap -C "$conf" -K "$T" "${pkgs[@]}" && break
+        (( attempt < 3 )) || die "package install failed 3 times (network?). Rerun mobius-install."
+        say "Package download failed, retrying ($attempt/3)..."
+        sleep 5
+    done
     (( DRY )) || write_pacman_conf "$T/etc/pacman.conf" "Server = $REMOTE_REPO_URL"
 }
 
