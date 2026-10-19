@@ -47,6 +47,10 @@ build_dir() {       # $1 = dir with PKGBUILD
     if already_built "$d"; then echo "== $name: up to date"; return; fi
     echo "== $name: building"
     install_build_deps "$d"
+    # Signing keys for verified sources (Arch convention: keys/pgp/<fingerprint>.asc)
+    if compgen -G "$d/keys/pgp/*.asc" >/dev/null; then
+        gpg --batch --quiet --import "$d"/keys/pgp/*.asc
+    fi
     # -d: deps are handled above, so runtime deps on not-yet-built packages don't block the build
     if ! (cd "$d" && env -u CI -u GITHUB_RUN_ID PKGDEST="$out" makepkg -d --noconfirm --needed -f); then
         [[ -n "${KEEP_GOING:-}" ]] || exit 1
