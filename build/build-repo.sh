@@ -26,16 +26,29 @@ already_built() {   # $1 = dir with PKGBUILD
         < <(cd "$1" && PKGDEST="$out" makepkg --packagelist)
 }
 
+install_build_deps() {  # $1 = dir with PKGBUILD
+    # Install makedepends/checkdepends, plus any depends the repos can already satisfy.
+    # Runtime deps that only exist later in this build (e.g. ntsync-autoload, provided by
+    # mobius-settings) are skipped; makepkg -d then doesn't insist on them.
+    local dep want=()
+    while read -r dep; do
+        pacman -T "$dep" >/dev/null 2>&1 && continue                    # already installed
+        pacman -Sp --print-format '%n' "$dep" >/dev/null 2>&1 && want+=("$dep")
+    done < <(cd "$1" && makepkg --printsrcinfo \
+        | sed -n 's/^\t\(make\|check\)\?depends = //p' | sort -u)
+    if (( ${#want[@]} )); then
+        sudo pacman -S --needed --noconfirm --asdeps "${want[@]}"
+    fi
+}
+
 build_dir() {       # $1 = dir with PKGBUILD
     local d="$1" name; name="$(basename "$d")"
     if [[ " ${SKIP_PKGS:-} " == *" $name "* ]]; then echo "== $name: skipped (SKIP_PKGS)"; return; fi
     if already_built "$d"; then echo "== $name: up to date"; return; fi
     echo "== $name: building"
-    # Packages with nothing to compile (metas, repacks, configs) skip dependency
-    # installation, so runtime-only deps on not-yet-built packages don't block them.
-    local deps=(-s)
-    grep -qE '^build\(\)' "$d/PKGBUILD" || deps=(-d)
-    if ! (cd "$d" && env -u CI -u GITHUB_RUN_ID PKGDEST="$out" makepkg "${deps[@]}" --noconfirm --needed -f); then
+    install_build_deps "$d"
+    # -d: deps are handled above, so runtime deps on not-yet-built packages don't block the build
+    if ! (cd "$d" && env -u CI -u GITHUB_RUN_ID PKGDEST="$out" makepkg -d --noconfirm --needed -f); then
         [[ -n "${KEEP_GOING:-}" ]] || exit 1
         echo "== $name: FAILED (continuing, KEEP_GOING set)"; failed+=("$name"); return
     fi
