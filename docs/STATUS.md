@@ -32,7 +32,7 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 ## Not yet verified
 - **reuse mode** (install over the existing CachyOS btrfs, keeping `@home`). Logic written and reviewed, not run. Run `mobius-install --dry-run` first on the real machine.
 - **Anything on real hardware**: RX 9060 XT under linux-mobius, monitor auto-detection by EDID name, Waybar GPU module, Steam/Proton games, Claude Desktop sign-in with the keyring.
-- **GitHub Actions workflow**: written, never run (no GitHub repo exists yet).
+- **GitHub Actions workflow**: written, never run yet. Trigger it from the Actions tab after merging.
 - Package signing: the `[mobius]` repo is unsigned (`SigLevel = Optional TrustAll`). Fine while it's only you, worth fixing before anyone else uses it.
 
 ## End-to-end VM test (2026-10-19)
