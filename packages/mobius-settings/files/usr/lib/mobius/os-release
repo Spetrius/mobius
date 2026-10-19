@@ -1,0 +1,8 @@
+NAME="Mobius Linux"
+PRETTY_NAME="Mobius Linux"
+ID=mobius
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;64;160;255"
+HOME_URL="https://github.com/@MOBIUS_GH@"
+LOGO=archlinux-logo

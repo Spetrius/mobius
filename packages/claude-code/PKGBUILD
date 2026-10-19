@@ -1,0 +1,33 @@
+# Claude Code CLI, official native binary from Anthropic's release bucket.
+# Bump with ./update.sh (reads the stable channel and pins the manifest sha256).
+# The in-app auto-updater is turned off via managed settings; pacman owns updates.
+pkgname=claude-code
+pkgver=2.1.292
+pkgrel=1
+pkgdesc='Claude Code, the agentic coding CLI from Anthropic (native build)'
+arch=('x86_64')
+url='https://code.claude.com'
+license=('LicenseRef-Anthropic')
+depends=('glibc')
+optdepends=(
+  'bubblewrap: sandboxed command execution'
+  'socat: sandbox network proxy'
+  'ripgrep: faster search'
+  'git: repository features'
+)
+options=('!strip' '!debug')
+_base=https://downloads.claude.ai/claude-code-releases
+source=("claude-${pkgver}::${_base}/${pkgver}/linux-x64/claude")
+sha256sums=('a967e7b1d8b4e47ee421d5433027880347952b0c0857abf880e2c942a4ec93b3')
+noextract=("claude-${pkgver}")
+
+package() {
+  install -Dm755 "claude-${pkgver}" "$pkgdir/usr/bin/claude"
+  install -Dm644 /dev/stdin "$pkgdir/etc/claude-code/managed-settings.json" <<'JSON'
+{
+  "env": {
+    "DISABLE_AUTOUPDATER": "1"
+  }
+}
+JSON
+}

@@ -1,0 +1,7 @@
+# Mobius login: tuigreet on VT1, launches Hyprland directly (no UWSM).
+[terminal]
+vt = 1
+
+[default_session]
+command = "tuigreet --time --remember --asterisks --cmd start-hyprland"
+user = "greeter"

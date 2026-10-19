@@ -1,0 +1,326 @@
+#!/bin/bash
+# Mobius Linux installer. Run from the Mobius live ISO as root.
+#
+#   mobius-install            interactive
+#   mobius-install --dry-run  print what would happen, touch nothing
+#
+# Modes:
+#   fresh  wipe one whole disk: 4 GiB EFI + btrfs (@, @home, @root, @srv, @cache, @log, @tmp)
+#   reuse  install onto an existing EFI + btrfs pair; keeps @home, renames the old @ (and @root, @log, ...) to @-old-<date>
+#
+# Unattended (used for VM tests): set MOBIUS_MODE, MOBIUS_DISK (fresh) or MOBIUS_ESP + MOBIUS_ROOT
+# (reuse), MOBIUS_USER, MOBIUS_PASS, MOBIUS_HOSTNAME, MOBIUS_CONFIRM=<disk serial or device>.
+# Testing only: MOBIUS_PKGS overrides the package set, MOBIUS_TEST=1 skips UEFI/network checks
+# and NVRAM registration.
+set -euo pipefail
+
+# ---------------------------------------------------------------- settings
+PROTECTED_LABELS=("GAMES" "DATA1" "DATA2" "External HD 1" "External HD 2")
+TIMEZONE="${MOBIUS_TZ:-America/Los_Angeles}"
+LOCALE="en_US.UTF-8"
+KEYMAP="us"
+LOCAL_REPO="/opt/mobius-repo"                  # shipped on the ISO
+REMOTE_REPO_URL="@MOBIUS_REPO_URL@"            # filled in at ISO build time
+BTRFS_OPTS="noatime,compress=zstd:1,space_cache=v2"
+SUBVOLS=("@:/" "@home:/home" "@root:/root" "@srv:/srv" "@cache:/var/cache" "@log:/var/log" "@tmp:/var/tmp")
+EXTRA_PKGS=(
+  firefox discord thunderbird libreoffice-fresh
+  android-tools android-udev
+  amdgpu_top vulkan-tools smartmontools
+  calibre foliate
+)
+
+DRY=0
+[[ "${1:-}" == "--dry-run" ]] && DRY=1
+T=/mnt
+
+# ---------------------------------------------------------------- helpers
+c_red=$'\e[1;31m'; c_grn=$'\e[1;32m'; c_blu=$'\e[1;34m'; c_rst=$'\e[0m'
+say()  { echo "${c_blu}::${c_rst} $*"; }
+ok()   { echo "${c_grn}ok${c_rst} $*"; }
+die()  { echo "${c_red}error:${c_rst} $*" >&2; exit 1; }
+run()  { if (( DRY )); then echo "  [dry-run] $*"; else "$@"; fi; }
+ask()  { # ask VAR "prompt" default
+    local __v="$1" __p="$2" __d="${3:-}" __a
+    if [[ -n "${!__v:-}" ]]; then return; fi
+    read -r -p "$__p${__d:+ [$__d]}: " __a
+    printf -v "$__v" '%s' "${__a:-$__d}"
+}
+in_target() { run arch-chroot "$T" "$@"; }
+
+labels_on() { # read labels straight from disk (blkid), not from the udev cache
+    local part
+    while IFS= read -r part; do
+        blkid -p -s LABEL -o value "$part" 2>/dev/null || true
+    done < <(lsblk -nrpo NAME "$1" 2>/dev/null)
+}
+
+refuse_if_protected() { # $1 = block device (disk or partition)
+    local lbl p
+    while IFS= read -r lbl; do
+        for p in "${PROTECTED_LABELS[@]}"; do
+            [[ "$lbl" == "$p" ]] && die "$1 holds the protected filesystem '$lbl'. Refusing to touch it."
+        done
+    done < <(labels_on "$1")
+}
+
+refuse_if_mounted() { # $1 = block device; catches the boot USB and anything in use
+    if lsblk -nro MOUNTPOINTS "$1" 2>/dev/null | grep -q .; then
+        die "$1 (or one of its partitions) is mounted. Pick a disk that isn't in use."
+    fi
+}
+
+serial_of() { [[ -n "$1" ]] || return 0; lsblk -dnro SERIAL "$1" 2>/dev/null | head -1 || true; }
+
+confirm_destroy() { # $1 = device, $2 = what happens
+    local dev="$1" ser want
+    ser="$(serial_of "$(lsblk -dnpo PKNAME "$dev" 2>/dev/null || true)")"
+    [[ -n "$ser" ]] || ser="$(serial_of "$dev")"
+    want="${ser:-$dev}"
+    echo
+    echo "${c_red}$2${c_rst}"
+    lsblk -o NAME,SIZE,FSTYPE,LABEL,MODEL,SERIAL,MOUNTPOINTS "$dev"
+    echo
+    local typed="${MOBIUS_CONFIRM:-}"
+    [[ -n "$typed" ]] || read -r -p "Type '$want' to continue: " typed
+    [[ "$typed" == "$want" ]] || die "confirmation did not match, nothing was changed"
+}
+
+# ---------------------------------------------------------------- preflight
+preflight() {
+    [[ $EUID -eq 0 ]] || die "run as root"
+    [[ -n "${MOBIUS_TEST:-}" ]] && { say "TEST MODE: skipping UEFI and network checks"; return; }
+    [[ -d /sys/firmware/efi/efivars ]] || die "not booted in UEFI mode (Limine setup here is UEFI only)"
+    [[ -d "$LOCAL_REPO" ]] || die "Mobius package repo not found at $LOCAL_REPO"
+    curl -fsI --max-time 10 https://archlinux.org >/dev/null 2>&1 || die "no network (Steam, Wine etc. come from Arch mirrors). Try: nmtui"
+    timedatectl set-ntp true || true
+}
+
+# ---------------------------------------------------------------- disks
+pick_mode() {
+    ask MOBIUS_MODE "Install mode: 'fresh' (wipe a whole disk) or 'reuse' (existing EFI + btrfs, keep @home)" "fresh"
+    [[ "$MOBIUS_MODE" == fresh || "$MOBIUS_MODE" == reuse ]] || die "unknown mode $MOBIUS_MODE"
+}
+
+prepare_fresh() {
+    echo; lsblk -dpo NAME,SIZE,MODEL,SERIAL,TRAN | grep -v '^/dev/\(loop\|sr\|zram\)'; echo
+    ask MOBIUS_DISK "Disk to ERASE for Mobius (e.g. /dev/sda)"
+    local d="$MOBIUS_DISK"
+    local dtype; dtype="$(lsblk -dno TYPE "$d" 2>/dev/null || true)"
+    [[ "$dtype" == disk || ( -n "${MOBIUS_TEST:-}" && "$dtype" == loop ) ]] || die "$d is not a disk"
+    refuse_if_protected "$d"; refuse_if_mounted "$d"
+    confirm_destroy "$d" "EVERYTHING on $d will be erased."
+
+    run wipefs -af "$d"
+    run sgdisk --zap-all "$d"
+    run sgdisk -n1:0:+4G -t1:ef00 -c1:MOBIUS_EFI -n2:0:0 -t2:8300 -c2:MOBIUS_ROOT "$d"
+    run partprobe "$d"; (( DRY )) || udevadm settle
+    local p=""; [[ "$d" =~ [0-9]$ ]] && p="p"
+    ESP="${d}${p}1"; ROOT="${d}${p}2"
+    run mkfs.fat -F32 -n MOBIUS_EFI "$ESP"
+    run mkfs.btrfs -f -L MOBIUS "$ROOT"
+
+    run mount -o subvolid=5 "$ROOT" "$T"
+    local sv
+    for sv in "${SUBVOLS[@]}"; do run btrfs subvolume create "$T/${sv%%:*}"; done
+    run umount "$T"
+}
+
+prepare_reuse() {
+    echo; lsblk -po NAME,SIZE,FSTYPE,LABEL,MOUNTPOINTS | grep -v 'loop\|sr0\|zram'; echo
+    ask MOBIUS_ESP  "Existing EFI partition (vfat, will be REFORMATTED)"
+    ask MOBIUS_ROOT "Existing btrfs partition (keeps @home)"
+    ESP="$MOBIUS_ESP"; ROOT="$MOBIUS_ROOT"
+    [[ "$(blkid -p -s TYPE -o value "$ESP" 2>/dev/null || true)" == vfat ]]  || die "$ESP is not vfat"
+    [[ "$(blkid -p -s TYPE -o value "$ROOT" 2>/dev/null || true)" == btrfs ]] || die "$ROOT is not btrfs"
+    refuse_if_protected "$ESP"; refuse_if_protected "$ROOT"
+    refuse_if_mounted "$ESP"; refuse_if_mounted "$ROOT"
+
+    run mount -o subvolid=5 "$ROOT" "$T"
+    (( DRY )) || [[ -d "$T/@home" ]] || { umount "$T"; die "no @home subvolume on $ROOT"; }
+    confirm_destroy "$ESP" "$ESP will be reformatted. On $ROOT the old @ becomes @-old-$(date +%F-%H%M) (kept, not deleted); @home is kept."
+    local stamp; stamp="$(date +%F-%H%M)"
+    local sv name
+    for sv in "${SUBVOLS[@]}"; do
+        name="${sv%%:*}"
+        [[ "$name" == "@home" ]] && continue
+        if [[ -d "$T/$name" ]]; then
+            # Nested subvolumes (e.g. @/.snapshots) move with their parent
+            run mv "$T/$name" "$T/${name}-old-$stamp"
+        fi
+        run btrfs subvolume create "$T/$name"
+    done
+    run umount "$T"
+    run mkfs.fat -F32 -n MOBIUS_EFI "$ESP"
+}
+
+mount_target() {
+    local sv name mp
+    run mount -o "subvol=@,$BTRFS_OPTS" "$ROOT" "$T"
+    for sv in "${SUBVOLS[@]}"; do
+        name="${sv%%:*}"; mp="${sv#*:}"
+        [[ "$name" == "@" ]] && continue
+        run mkdir -p "$T$mp"
+        run mount -o "subvol=$name,$BTRFS_OPTS" "$ROOT" "$T$mp"
+    done
+    run mkdir -p "$T/boot"
+    run mount -o umask=0077 "$ESP" "$T/boot"
+}
+
+# ---------------------------------------------------------------- install
+write_pacman_conf() { # $1 = output path, $2 = mobius Server line
+    sed '/^\[mobius\]/,/^$/d' /etc/pacman.conf > "$1"
+    # Mobius repo goes first so our packages win over same-named ones
+    python3 - "$1" "$2" <<'PY'
+import sys, re
+path, server = sys.argv[1], sys.argv[2]
+s = open(path).read()
+block = "[mobius]\nSigLevel = Optional TrustAll\n" + server + "\n\n"
+s = s.replace("[core]", block + "[core]", 1)
+if not re.search(r"^\[multilib\]", s, re.M):
+    s += "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n"
+open(path, "w").write(s)
+PY
+}
+
+preseed_boot_config() {
+    local uuid; uuid="$(blkid -s UUID -o value "$ROOT")"
+    run mkdir -p "$T/etc/default"
+    (( DRY )) && { echo "  [dry-run] write $T/etc/default/limine (root=UUID=$uuid)"; return; }
+    cat > "$T/etc/default/limine" <<EOF
+# Mobius: read by limine-entry-tool and limine-snapper-sync
+ESP_PATH="/boot"
+TARGET_OS_NAME="Mobius Linux"
+KERNEL_CMDLINE[default]="root=UUID=$uuid rootflags=subvol=@ rw quiet nowatchdog zswap.enabled=0"
+ENABLE_LIMINE_FALLBACK=yes
+BOOT_ORDER="*, *fallback, Snapshots"
+MAX_SNAPSHOT_ENTRIES=12
+EOF
+}
+
+install_packages() {
+    say "Installing packages (this downloads Steam, Wine, etc. from Arch mirrors)"
+    local conf=/tmp/pacman-install.conf
+    write_pacman_conf "$conf" "Server = file://$LOCAL_REPO"
+    run pacman-key --init >/dev/null 2>&1 || true
+    run pacman-key --populate archlinux >/dev/null 2>&1 || true
+    run pacman -Sy --config "$conf"
+    local pkgs=(mobius-base mobius-desktop mobius-gaming "${EXTRA_PKGS[@]}")
+    [[ -n "${MOBIUS_PKGS:-}" ]] && read -r -a pkgs <<< "$MOBIUS_PKGS"
+    run pacstrap -C "$conf" -K "$T" "${pkgs[@]}"
+    (( DRY )) || write_pacman_conf "$T/etc/pacman.conf" "Server = $REMOTE_REPO_URL"
+}
+
+configure_system() {
+    say "Configuring system"
+    (( DRY )) || genfstab -U "$T" | sed 's/,subvolid=[0-9]*//' > "$T/etc/fstab"
+    add_data_mounts
+
+    in_target ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+    in_target hwclock --systohc
+    run sed -i "s/^#\($LOCALE\)/\1/" "$T/etc/locale.gen"
+    in_target locale-gen
+    (( DRY )) || {
+        echo "LANG=$LOCALE" > "$T/etc/locale.conf"
+        echo "KEYMAP=$KEYMAP" > "$T/etc/vconsole.conf"
+        echo "$MOBIUS_HOSTNAME" > "$T/etc/hostname"
+        printf '127.0.0.1 localhost\n::1 localhost\n127.0.1.1 %s\n' "$MOBIUS_HOSTNAME" > "$T/etc/hosts"
+    }
+
+    # User: fish shell, groups for audio realtime, gamepads, Cowork VMs, gamemode
+    local groups="" g
+    for g in wheel audio video input kvm gamemode; do
+        if (( DRY )) || arch-chroot "$T" getent group "$g" >/dev/null; then groups+="${groups:+,}$g"; fi
+    done
+    in_target useradd -m -G "$groups" -s /usr/bin/fish "$MOBIUS_USER"
+    (( DRY )) || {
+        echo "$MOBIUS_USER:$MOBIUS_PASS" | arch-chroot "$T" chpasswd
+        echo "%wheel ALL=(ALL:ALL) ALL" > "$T/etc/sudoers.d/10-wheel"
+        chmod 440 "$T/etc/sudoers.d/10-wheel"
+    }
+    in_target passwd -l root
+
+    # Login keyring unlocks with the login password (Claude Desktop stays signed in)
+    (( DRY )) || grep -q pam_gnome_keyring "$T/etc/pam.d/greetd" || cat >> "$T/etc/pam.d/greetd" <<'EOF'
+auth     optional  pam_gnome_keyring.so
+session  optional  pam_gnome_keyring.so auto_start
+EOF
+
+    in_target systemctl enable NetworkManager systemd-resolved systemd-timesyncd greetd \
+        ananicy-cpp pci-latency systemd-oomd power-profiles-daemon fstrim.timer tailscaled \
+        limine-snapper-sync snapper-timeline.timer snapper-cleanup.timer
+    run ln -sf /run/systemd/resolve/stub-resolv.conf "$T/etc/resolv.conf"
+}
+
+add_data_mounts() {
+    # Re-attach the game and data drives by label if they are present. nofail so a
+    # missing drive never blocks boot.
+    local lbl mp uuid fs
+    for pair in "GAMES:/mnt/games" "DATA1:/mnt/data1" "DATA2:/mnt/data2"; do
+        lbl="${pair%%:*}"; mp="${pair#*:}"
+        # blkid exits 2 when nothing matches; that's the normal "drive not here" case
+        uuid="$(blkid -t LABEL="$lbl" -s UUID -o value 2>/dev/null | head -1 || true)"
+        [[ -n "$uuid" ]] || continue
+        fs="$(blkid -t LABEL="$lbl" -s TYPE -o value 2>/dev/null | head -1 || true)"
+        say "Found $lbl ($fs), mounting at $mp"
+        run mkdir -p "$T$mp"
+        (( DRY )) || echo "UUID=$uuid  $mp  $fs  defaults,noatime,nofail,x-systemd.device-timeout=10s  0 2" >> "$T/etc/fstab"
+    done
+}
+
+setup_snapshots_and_boot() {
+    say "Setting up snapper and Limine"
+    # snapper wants to create .snapshots itself, as a nested subvolume of @
+    in_target snapper --no-dbus -c root create-config /
+    in_target snapper --no-dbus -c root set-config TIMELINE_LIMIT_HOURLY=5 TIMELINE_LIMIT_DAILY=7 \
+        TIMELINE_LIMIT_WEEKLY=2 TIMELINE_LIMIT_MONTHLY=0 TIMELINE_LIMIT_YEARLY=0 NUMBER_LIMIT=20
+
+    # Kernels and initramfs onto the ESP, limine.conf written, Limine registered in NVRAM
+    # and also installed as the fallback loader (EFI/BOOT/BOOTX64.EFI) in case NVRAM gets wiped.
+    if [[ -n "${MOBIUS_TEST:-}" ]]; then
+        in_target limine-install --skip-uefi --fallback
+    else
+        in_target limine-install --fallback
+    fi
+    in_target limine-mkinitcpio
+    (( DRY )) || arch-chroot "$T" /usr/lib/mobius/boot-guard post || die "kernel verification failed"
+}
+
+copy_install_log() {
+    (( DRY )) && return
+    mkdir -p "$T/var/log/mobius"
+    cp /tmp/mobius-install.log "$T/var/log/mobius/install.log" 2>/dev/null || true
+}
+
+# ---------------------------------------------------------------- main
+main() {
+    echo "${c_blu}Mobius Linux installer${c_rst}"
+    (( DRY )) && echo "(dry run: nothing will be changed)"
+    preflight
+    pick_mode
+    ask MOBIUS_HOSTNAME "Hostname" "spetlin"
+    ask MOBIUS_USER "Username" "spetrius"
+    if [[ -z "${MOBIUS_PASS:-}" ]]; then
+        local p2
+        read -r -s -p "Password for $MOBIUS_USER: " MOBIUS_PASS; echo
+        read -r -s -p "Again: " p2; echo
+        [[ "$MOBIUS_PASS" == "$p2" && -n "$MOBIUS_PASS" ]] || die "passwords did not match"
+    fi
+
+    if [[ "$MOBIUS_MODE" == fresh ]]; then prepare_fresh; else prepare_reuse; fi
+    mount_target
+    preseed_boot_config
+    install_packages
+    configure_system
+    setup_snapshots_and_boot
+    copy_install_log
+    run umount -R "$T"
+    echo
+    ok "Mobius is installed. Remove the USB stick and reboot."
+    if [[ "$MOBIUS_MODE" == reuse ]]; then
+        echo "Your old home is untouched. To take the Mobius desktop config: mobius-skel-sync --force"
+    fi
+}
+
+main "$@" 2>&1 | tee /tmp/mobius-install.log
+exit "${PIPESTATUS[0]}"

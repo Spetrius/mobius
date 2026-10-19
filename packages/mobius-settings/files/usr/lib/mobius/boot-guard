@@ -1,0 +1,73 @@
+#!/bin/bash
+# Mobius boot guard. "pre" aborts the transaction if /boot is not the mounted ESP.
+# "post" checks that each installed kernel image has an identical copy somewhere
+# under /boot and that an initramfs exists for it.
+set -u
+red=$'\e[1;31m'; grn=$'\e[1;32m'; rst=$'\e[0m'
+
+check_mounted() {
+    if ! mountpoint -q /boot; then
+        echo "${red}==> /boot is NOT mounted. Refusing to install kernels into an empty directory.${rst}"
+        echo "    Fix: sudo mount /boot   (then rerun the update)"
+        return 1
+    fi
+    local fstype
+    fstype="$(findmnt -no FSTYPE /boot)"
+    if [[ "$fstype" != "vfat" ]]; then
+        echo "${red}==> /boot is mounted but is $fstype, expected vfat (EFI).${rst}"
+        return 1
+    fi
+    # First mount option is rw/ro. Don't grep the whole string: vfat has errors=remount-ro.
+    if [[ "$(findmnt -no OPTIONS /boot | cut -d, -f1)" != rw ]]; then
+        echo "${red}==> /boot is read-only.${rst}"
+        return 1
+    fi
+}
+
+boot_kernel_candidates() {
+    # With Limine, only the kernels limine.conf actually boots count (stray copies on
+    # the ESP don't). Snapshot entries live under limine_history/ and are skipped.
+    if [[ -f /boot/limine.conf ]]; then
+        sed -n 's|^[[:space:]]*path:[[:space:]]*boot():\(/[^#]*\).*|/boot\1|p' /boot/limine.conf \
+            | grep -v '/limine_history/' | grep 'vmlinuz' || true
+    else
+        find /boot -xdev -type f -name 'vmlinuz*' 2>/dev/null || true
+    fi
+}
+
+verify_kernels() {
+    # Kernels may live at /boot/vmlinuz-<name> (plain mkinitcpio) or
+    # /boot/<machine-id>/<name>/vmlinuz-<name> (limine-entry-tool), so match by content.
+    local bad=0 modvmlinuz pkgbase sum found dir
+    for modvmlinuz in /usr/lib/modules/*/vmlinuz; do
+        [[ -f "$modvmlinuz" ]] || continue
+        pkgbase="$(cat "${modvmlinuz%/vmlinuz}/pkgbase" 2>/dev/null || echo unknown)"
+        sum="$(sha256sum "$modvmlinuz" | cut -d' ' -f1)"
+        found=""
+        while IFS= read -r f; do
+            [[ -f "$f" ]] || continue
+            if [[ "$(sha256sum "$f" | cut -d' ' -f1)" == "$sum" ]]; then found="$f"; break; fi
+        done < <(boot_kernel_candidates)
+        if [[ -z "$found" ]]; then
+            echo "${red}==> $pkgbase: kernel image did NOT reach /boot. DO NOT REBOOT.${rst}"
+            echo "    Fix: sudo limine-mkinitcpio   then: sudo /usr/lib/mobius/boot-guard post"
+            bad=1
+            continue
+        fi
+        dir="$(dirname "$found")"
+        if ! find "$dir" -maxdepth 1 -type f -name 'initramfs*' 2>/dev/null | grep -q .; then
+            echo "${red}==> $pkgbase: no initramfs next to $found. DO NOT REBOOT.${rst}"
+            echo "    Fix: sudo limine-mkinitcpio"
+            bad=1
+            continue
+        fi
+        echo "${grn}  ok${rst} $pkgbase -> $found"
+    done
+    return $bad
+}
+
+case "${1:-}" in
+    pre)  check_mounted ;;
+    post) check_mounted && verify_kernels ;;
+    *)    echo "usage: boot-guard pre|post" >&2; exit 2 ;;
+esac

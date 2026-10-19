@@ -1,0 +1,7 @@
+#!/bin/bash
+# Start awww (formerly swww) and show ~/Pictures/Wallpapers/current.* or the Mobius default.
+awww-daemon >/dev/null 2>&1 &
+for _ in $(seq 1 50); do awww query >/dev/null 2>&1 && break; sleep 0.1; done
+img="$(ls ~/Pictures/Wallpapers/current.* 2>/dev/null | head -1)"
+[[ -n "$img" ]] || img=/usr/share/mobius/wallpaper.png
+exec awww img "$img" --transition-type fade

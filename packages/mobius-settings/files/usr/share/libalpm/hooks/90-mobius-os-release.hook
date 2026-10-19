@@ -1,0 +1,12 @@
+# filesystem ships Arch's os-release; put ours back after every filesystem upgrade.
+[Trigger]
+Type = Package
+Operation = Install
+Operation = Upgrade
+Target = filesystem
+Target = mobius-settings
+
+[Action]
+Description = Mobius: setting os-release...
+When = PostTransaction
+Exec = /usr/bin/install -m644 /usr/lib/mobius/os-release /usr/lib/os-release

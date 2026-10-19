@@ -1,0 +1,16 @@
+#!/bin/bash
+# Copy Mobius default configs into your home WITHOUT overwriting anything you already have.
+# Use --force to back up your current ~/.config/<app> and take the Mobius version.
+set -euo pipefail
+force=0; [[ "${1:-}" == "--force" ]] && force=1
+stamp="$(date +%Y%m%d-%H%M%S)"
+cd /etc/skel/.config
+for app in */; do
+    app="${app%/}"; dest="$HOME/.config/$app"
+    if [[ -e "$dest" && $force -eq 1 ]]; then
+        mv "$dest" "$dest.bak-$stamp"; echo "backed up $dest -> $dest.bak-$stamp"
+    fi
+    mkdir -p "$dest"
+    cp -rn "/etc/skel/.config/$app/." "$dest/"
+    echo "synced $app"
+done

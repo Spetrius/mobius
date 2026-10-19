@@ -1,0 +1,8 @@
+post_install() {
+  install -m644 /usr/lib/mobius/os-release /usr/lib/os-release
+  echo ":: Enable the tuning services with:"
+  echo "   systemctl enable ananicy-cpp pci-latency systemd-oomd power-profiles-daemon"
+}
+post_upgrade() {
+  install -m644 /usr/lib/mobius/os-release /usr/lib/os-release
+}

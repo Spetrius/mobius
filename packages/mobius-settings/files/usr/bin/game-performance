@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Helper script to enable the performance gov with proton or others
+if command -v powerprofilesctl &>/dev/null; then
+    PROFILE_CMD="powerprofilesctl"
+elif command -v tlpctl &>/dev/null; then
+    PROFILE_CMD="tlpctl"
+else
+    echo "Error: Neither powerprofilesctl nor tlpctl found" >&2
+    exit 1
+fi
+
+# Don't fail if the CPU driver doesn't support performance power profile
+if ! "$PROFILE_CMD" list | grep -q 'performance:'; then
+    exec "$@"
+fi
+
+# Set performance governors, as long the game is launched
+if [ -n "$GAME_PERFORMANCE_SCREENSAVER_ON" ]; then
+    exec "$PROFILE_CMD" launch -p performance \
+        -r "Launched with Mobius game-performance utility" -- "$@"
+else
+    exec systemd-inhibit --why "Mobius game-performance is running" "$PROFILE_CMD" launch \
+        -p performance -r "Launched with Mobius game-performance utility" -- "$@"
+fi

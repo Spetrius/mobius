@@ -1,0 +1,17 @@
+# Refuse to touch kernels while the EFI partition is not mounted on /boot.
+# This is the failure that left the old CachyOS install unbootable on 2026-09-29.
+[Trigger]
+Type = Path
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Target = usr/lib/modules/*/vmlinuz
+Target = usr/lib/initcpio/*
+Target = boot/*
+Target = usr/lib/limine/*
+
+[Action]
+Description = Mobius: checking that /boot (EFI) is mounted...
+When = PreTransaction
+Exec = /usr/lib/mobius/boot-guard pre
+AbortOnFail
