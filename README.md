@@ -52,6 +52,7 @@ sudo pacman -S --needed archiso base-devel git
 git clone <this repo> ~/mobius
 cd ~/mobius
 build/build-repo.sh            # 1-3 hours the first time (kernel); later runs skip unchanged packages
+                               # the kernel build needs about 30 GB of free disk while it runs
 sudo build/build-iso.sh        # writes out/iso/mobius-*.iso
 ```
 

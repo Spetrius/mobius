@@ -17,7 +17,8 @@ check_mounted() {
         echo "${red}==> /boot is mounted but is $fstype, expected vfat (EFI).${rst}"
         return 1
     fi
-    if [[ ! -w /boot ]] || findmnt -no OPTIONS /boot | grep -qw ro; then
+    # First mount option is rw/ro. Don't grep the whole string: vfat has errors=remount-ro.
+    if [[ "$(findmnt -no OPTIONS /boot | cut -d, -f1)" != rw ]]; then
         echo "${red}==> /boot is read-only.${rst}"
         return 1
     fi

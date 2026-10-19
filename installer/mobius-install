@@ -131,8 +131,8 @@ prepare_reuse() {
     ask MOBIUS_ESP  "Existing EFI partition (vfat, will be REFORMATTED)"
     ask MOBIUS_ROOT "Existing btrfs partition (keeps @home)"
     ESP="$MOBIUS_ESP"; ROOT="$MOBIUS_ROOT"
-    [[ "$(lsblk -no FSTYPE "$ESP")" == vfat ]]  || die "$ESP is not vfat"
-    [[ "$(lsblk -no FSTYPE "$ROOT")" == btrfs ]] || die "$ROOT is not btrfs"
+    [[ "$(blkid -p -s TYPE -o value "$ESP" 2>/dev/null || true)" == vfat ]]  || die "$ESP is not vfat"
+    [[ "$(blkid -p -s TYPE -o value "$ROOT" 2>/dev/null || true)" == btrfs ]] || die "$ROOT is not btrfs"
     refuse_if_protected "$ESP"; refuse_if_protected "$ROOT"
     refuse_if_mounted "$ESP"; refuse_if_mounted "$ROOT"
 
@@ -258,9 +258,10 @@ add_data_mounts() {
     local lbl mp uuid fs
     for pair in "GAMES:/mnt/games" "DATA1:/mnt/data1" "DATA2:/mnt/data2"; do
         lbl="${pair%%:*}"; mp="${pair#*:}"
-        uuid="$(blkid -t LABEL="$lbl" -s UUID -o value 2>/dev/null | head -1)"
+        # blkid exits 2 when nothing matches; that's the normal "drive not here" case
+        uuid="$(blkid -t LABEL="$lbl" -s UUID -o value 2>/dev/null | head -1 || true)"
         [[ -n "$uuid" ]] || continue
-        fs="$(blkid -t LABEL="$lbl" -s TYPE -o value | head -1)"
+        fs="$(blkid -t LABEL="$lbl" -s TYPE -o value 2>/dev/null | head -1 || true)"
         say "Found $lbl ($fs), mounting at $mp"
         run mkdir -p "$T$mp"
         (( DRY )) || echo "UUID=$uuid  $mp  $fs  defaults,noatime,nofail,x-systemd.device-timeout=10s  0 2" >> "$T/etc/fstab"
