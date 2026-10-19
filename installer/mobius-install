@@ -317,7 +317,9 @@ main() {
     run umount -R "$T"
     echo
     ok "Mobius is installed. Remove the USB stick and reboot."
-    [[ "$MOBIUS_MODE" == reuse ]] && echo "Your old home is untouched. To take the Mobius desktop config: mobius-skel-sync --force"
+    if [[ "$MOBIUS_MODE" == reuse ]]; then
+        echo "Your old home is untouched. To take the Mobius desktop config: mobius-skel-sync --force"
+    fi
 }
 
 main "$@" 2>&1 | tee /tmp/mobius-install.log

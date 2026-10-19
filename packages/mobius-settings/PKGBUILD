@@ -4,7 +4,7 @@
 # Added: boot guard pacman hooks, mobius-update, os-release.
 pkgname=mobius-settings
 pkgver=2026.10.18
-pkgrel=3
+pkgrel=4
 pkgdesc='Mobius Linux system tuning: sysctl, zram, udev, I/O schedulers, systemd defaults, boot guard'
 arch=('any')
 license=('GPL-3.0-or-later')

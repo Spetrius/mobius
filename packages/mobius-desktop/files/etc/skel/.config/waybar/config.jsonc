@@ -7,13 +7,13 @@
   "hyprland/workspaces": { "format": "{id}", "on-click": "activate" },
   "hyprland/window": { "max-length": 60 },
   "clock": { "format": "{:%a %b %d  %H:%M}", "tooltip-format": "{calendar}" },
-  "cpu": { "format": " {usage}%", "interval": 3 },
-  "memory": { "format": " {percentage}%", "interval": 5 },
+  "cpu": { "format": "\uf4bc {usage}%", "interval": 3 },
+  "memory": { "format": "\uefc5 {percentage}%", "interval": 5 },
   "custom/gpu": {
     "exec": "cat /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -1",
     "format": "󰢮 {}%", "interval": 3
   },
-  "pulseaudio": { "format": " {volume}%", "format-muted": " muted", "on-click": "pavucontrol" },
-  "network": { "format-ethernet": "󰈀 {ipaddr}", "format-wifi": " {essid}", "format-disconnected": "offline" },
+  "pulseaudio": { "format": "\uf028 {volume}%", "format-muted": "\uf6a9 muted", "on-click": "pavucontrol" },
+  "network": { "format-ethernet": "󰈀 {ipaddr}", "format-wifi": "\uf1eb {essid}", "format-disconnected": "offline" },
   "tray": { "spacing": 8 }
 }

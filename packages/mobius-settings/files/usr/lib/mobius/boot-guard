@@ -24,6 +24,17 @@ check_mounted() {
     fi
 }
 
+boot_kernel_candidates() {
+    # With Limine, only the kernels limine.conf actually boots count (stray copies on
+    # the ESP don't). Snapshot entries live under limine_history/ and are skipped.
+    if [[ -f /boot/limine.conf ]]; then
+        sed -n 's|^[[:space:]]*path:[[:space:]]*boot():\(/[^#]*\).*|/boot\1|p' /boot/limine.conf \
+            | grep -v '/limine_history/' | grep 'vmlinuz' || true
+    else
+        find /boot -xdev -type f -name 'vmlinuz*' 2>/dev/null || true
+    fi
+}
+
 verify_kernels() {
     # Kernels may live at /boot/vmlinuz-<name> (plain mkinitcpio) or
     # /boot/<machine-id>/<name>/vmlinuz-<name> (limine-entry-tool), so match by content.
@@ -33,9 +44,10 @@ verify_kernels() {
         pkgbase="$(cat "${modvmlinuz%/vmlinuz}/pkgbase" 2>/dev/null || echo unknown)"
         sum="$(sha256sum "$modvmlinuz" | cut -d' ' -f1)"
         found=""
-        while IFS= read -r -d '' f; do
+        while IFS= read -r f; do
+            [[ -f "$f" ]] || continue
             if [[ "$(sha256sum "$f" | cut -d' ' -f1)" == "$sum" ]]; then found="$f"; break; fi
-        done < <(find /boot -xdev -type f -name 'vmlinuz*' -print0 2>/dev/null)
+        done < <(boot_kernel_candidates)
         if [[ -z "$found" ]]; then
             echo "${red}==> $pkgbase: kernel image did NOT reach /boot. DO NOT REBOOT.${rst}"
             echo "    Fix: sudo limine-mkinitcpio   then: sudo /usr/lib/mobius/boot-guard post"
