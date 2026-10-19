@@ -34,11 +34,13 @@ sed -i "s|@MOBIUS_REPO_URL@|$MOBIUS_REPO_URL|" "$prof/airootfs/usr/local/bin/mob
 
 # Offline Mobius repo (kernel, settings, metas, Claude, GE-Proton...)
 mkdir -p "$prof/airootfs/opt/mobius-repo"
-cp -a "$repo"/*.pkg.tar.zst "$repo"/mobius.db* "$repo"/mobius.files* "$prof/airootfs/opt/mobius-repo/"
+cp -a "$repo"/*.pkg.tar.zst "$repo"/mobius.db "$repo"/mobius.db.tar.zst "$repo"/mobius.files "$repo"/mobius.files.tar.zst "$prof/airootfs/opt/mobius-repo/"
 rm -f "$prof"/airootfs/opt/mobius-repo/*-debug-*.pkg.tar.zst
 # repo-add made symlinks; make them real files inside the image
 for f in mobius.db mobius.files; do
-    [[ -L "$prof/airootfs/opt/mobius-repo/$f" ]] && cp --remove-destination "$repo/$f.tar.zst" "$prof/airootfs/opt/mobius-repo/$f"
+    if [[ -L "$prof/airootfs/opt/mobius-repo/$f" ]]; then
+        cp --remove-destination "$repo/$f.tar.zst" "$prof/airootfs/opt/mobius-repo/$f"
+    fi
 done
 
 cat > "$prof/airootfs/etc/motd" <<'EOF'
@@ -47,7 +49,7 @@ cat > "$prof/airootfs/etc/motd" <<'EOF'
 
   Install:      mobius-install
   Practice run: mobius-install --dry-run
-  Wi-Fi:        iwctl     Network check: ping archlinux.org
+  Wi-Fi:        iwctl     Network check: curl -I https://archlinux.org
 
 EOF
 

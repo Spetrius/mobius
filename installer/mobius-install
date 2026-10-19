@@ -92,7 +92,7 @@ preflight() {
     [[ -n "${MOBIUS_TEST:-}" ]] && { say "TEST MODE: skipping UEFI and network checks"; return; }
     [[ -d /sys/firmware/efi/efivars ]] || die "not booted in UEFI mode (Limine setup here is UEFI only)"
     [[ -d "$LOCAL_REPO" ]] || die "Mobius package repo not found at $LOCAL_REPO"
-    ping -c1 -W3 archlinux.org >/dev/null 2>&1 || die "no network (Steam, Wine etc. come from Arch mirrors). Try: nmtui"
+    curl -fsI --max-time 10 https://archlinux.org >/dev/null 2>&1 || die "no network (Steam, Wine etc. come from Arch mirrors). Try: nmtui"
     timedatectl set-ntp true || true
 }
 
