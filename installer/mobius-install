@@ -19,8 +19,9 @@ PROTECTED_LABELS=("GAMES" "DATA1" "DATA2" "External HD 1" "External HD 2")
 TIMEZONE="${MOBIUS_TZ:-America/Los_Angeles}"
 LOCALE="en_US.UTF-8"
 KEYMAP="us"
-LOCAL_REPO="/opt/mobius-repo"                  # shipped on the ISO
 REMOTE_REPO_URL="@MOBIUS_REPO_URL@"            # filled in at ISO build time
+# Where this install pulls Mobius packages from. Override (e.g. file:///path) only for testing.
+INSTALL_REPO_URL="${MOBIUS_REPO_URL:-$REMOTE_REPO_URL}"
 BTRFS_OPTS="noatime,compress=zstd:1,space_cache=v2"
 SUBVOLS=("@:/" "@home:/home" "@root:/root" "@srv:/srv" "@cache:/var/cache" "@log:/var/log" "@tmp:/var/tmp")
 EXTRA_PKGS=(
@@ -59,9 +60,12 @@ refuse_if_protected() { # $1 = block device (disk or partition)
     local lbl p
     while IFS= read -r lbl; do
         for p in "${PROTECTED_LABELS[@]}"; do
-            [[ "$lbl" == "$p" ]] && die "$1 holds the protected filesystem '$lbl'. Refusing to touch it."
+            if [[ "$lbl" == "$p" ]]; then
+                die "$1 holds the protected filesystem '$lbl'. Refusing to touch it."
+            fi
         done
     done < <(labels_on "$1")
+    return 0   # an unprotected label must not leave a false status behind (set -e)
 }
 
 refuse_if_mounted() { # $1 = block device; catches the boot USB and anything in use
@@ -91,9 +95,16 @@ preflight() {
     [[ $EUID -eq 0 ]] || die "run as root"
     [[ -n "${MOBIUS_TEST:-}" ]] && { say "TEST MODE: skipping UEFI and network checks"; return; }
     [[ -d /sys/firmware/efi/efivars ]] || die "not booted in UEFI mode (Limine setup here is UEFI only)"
-    [[ -d "$LOCAL_REPO" ]] || die "Mobius package repo not found at $LOCAL_REPO"
     curl -fsI --max-time 10 https://archlinux.org >/dev/null 2>&1 || die "no network (Steam, Wine etc. come from Arch mirrors). Try: nmtui"
+    # Real GET: release downloads redirect to signed storage URLs that reject HEAD (401)
+    curl -fsL --max-time 30 -o /dev/null "$INSTALL_REPO_URL/mobius.db" \
+        || die "can't reach the Mobius package repo at $INSTALL_REPO_URL"
     timedatectl set-ntp true || true
+    # A previous failed run leaves its target mounted; on the live ISO /mnt is only ours.
+    if (( ! DRY )) && mountpoint -q "$T"; then
+        say "Unmounting leftovers of a previous run from $T"
+        umount -R "$T"
+    fi
 }
 
 # ---------------------------------------------------------------- disks
@@ -199,15 +210,23 @@ EOF
 }
 
 install_packages() {
-    say "Installing packages (this downloads Steam, Wine, etc. from Arch mirrors)"
+    say "Installing packages (Mobius repo on GitHub + Arch mirrors, a few GB)"
     local conf=/tmp/pacman-install.conf
-    write_pacman_conf "$conf" "Server = file://$LOCAL_REPO"
+    write_pacman_conf "$conf" "Server = $INSTALL_REPO_URL"
     run pacman-key --init >/dev/null 2>&1 || true
     run pacman-key --populate archlinux >/dev/null 2>&1 || true
     run pacman -Sy --config "$conf"
     local pkgs=(mobius-base mobius-desktop mobius-gaming "${EXTRA_PKGS[@]}")
     [[ -n "${MOBIUS_PKGS:-}" ]] && read -r -a pkgs <<< "$MOBIUS_PKGS"
-    run pacstrap -C "$conf" -K "$T" "${pkgs[@]}"
+    # A stalled mirror fails the download phase before anything is installed, so retrying
+    # is safe; pacman also moves on to the next mirror in the list each time.
+    local attempt
+    for attempt in 1 2 3; do
+        run pacstrap -C "$conf" -K "$T" "${pkgs[@]}" && break
+        (( attempt < 3 )) || die "package install failed 3 times (network?). Rerun mobius-install."
+        say "Package download failed, retrying ($attempt/3)..."
+        sleep 5
+    done
     (( DRY )) || write_pacman_conf "$T/etc/pacman.conf" "Server = $REMOTE_REPO_URL"
 }
 

@@ -14,8 +14,10 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 | Claude Desktop updater | Verifies Anthropic's key fingerprint, signed InRelease, Packages hash, then pins the .deb sha256 |
 | Every dependency name | Resolved against live Arch repos (several lib32 packages turned out to be gone from multilib and were removed) |
 | Installer safety rails | On a scratch disk: refuses a disk labeled GAMES, refuses `External HD 1` (label with spaces), refuses a mounted disk, refuses a wrong serial confirmation, leaves the disk untouched every time |
-| ISO | Builds (2.6 GB), boots in UEFI to the Mobius prompt, contains the installer and offline repo |
+| ISO | Builds (1.5 GB, under GitHub's 2 GB release limit), boots in UEFI to the Mobius prompt. Mobius packages are downloaded from the published `repo` release during install |
+| GitHub build | The Actions workflow builds every package including the kernel (about 2.5 h) and publishes the pacman repo; pacman installs from it |
 | Installer, fresh mode, UEFI | Full run in a VM, no test shortcuts: partitioning, btrfs subvolumes, 992 packages (Steam, Wine, Lutris, LibreOffice...), user, services, snapper, Limine registered in UEFI NVRAM |
+| Installer, reuse mode | VM, over a real Mobius install: kept `@home` (marker file intact, same owner), kept the old root as `@-old-<date>` with its snapshots, new system boots with nothing failed |
 | Installed system boots | Limine (via its UEFI entry), linux-mobius kernel, greetd/tuigreet login, Hyprland session with Waybar, wallpaper and autostart |
 
 ## Bugs the tests caught (all fixed)
@@ -28,11 +30,15 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 - limine-snapper-sync was missing `inotify-tools` for its watcher (snapshot entries still worked via the snapper plugin).
 - Waybar icons were lost from the config file; now written as `\u` escapes.
 - Installer reported exit code 1 after a successful fresh install.
+- Installer **quit silently on any disk with an ordinary partition label** (it would have hit your CachyOS SSD in reuse mode).
+- A failed install left the target mounted, which blocked a retry; the installer now cleans it up.
+- One stalled Arch mirror aborted the whole install; the package step now retries up to 3 times (seen working in the VM).
+- Repo reachability check used a HEAD request, which GitHub's download links reject.
 
 ## Not yet verified
-- **reuse mode** (install over the existing CachyOS btrfs, keeping `@home`). Logic written and reviewed, not run. Run `mobius-install --dry-run` first on the real machine.
+- **reuse mode over CachyOS specifically**: tested over a Mobius install in a VM, not over CachyOS's layout. Run `mobius-install --dry-run` first on the real machine.
 - **Anything on real hardware**: RX 9060 XT under linux-mobius, monitor auto-detection by EDID name, Waybar GPU module, Steam/Proton games, Claude Desktop sign-in with the keyring.
-- **GitHub Actions workflow**: written, never run yet. Trigger it from the Actions tab after merging.
+- **ISO publishing**: the ISO upload step hasn't succeeded on GitHub yet (it will once this fix is merged and a build runs).
 - Package signing: the `[mobius]` repo is unsigned (`SigLevel = Optional TrustAll`). Fine while it's only you, worth fixing before anyone else uses it.
 
 ## End-to-end VM test (2026-10-19)

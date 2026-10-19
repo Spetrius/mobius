@@ -25,7 +25,7 @@ Personal Arch-based distro for one machine: `spetlin` (Ryzen 7 5800X3D, RX 9060 
 - `packages/aur.list`: AUR packages rebuilt into our repo, `name commit`, in dependency order
 - `build/config.sh`: GitHub owner/repo, package build order
 - `build/build-repo.sh`: builds everything into `out/repo`, skips packages whose exact version already exists. `SKIP_PKGS=`, `KEEP_GOING=1`.
-- `build/build-iso.sh`: releng profile + installer + offline copy of the repo
+- `build/build-iso.sh`: releng profile + installer. No offline repo: GitHub release assets must be < 2 GB, so the installer downloads Mobius packages from the `repo` release
 - `installer/mobius-install`: `fresh` / `reuse` modes, `--dry-run`, unattended via `MOBIUS_*` env vars
 
 ## Rules when changing things

@@ -49,7 +49,7 @@ jobs:
               sed -i "s/^#MAKEFLAGS.*/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf
               chown -R builder: /src
               sudo -u builder env MOBIUS_GH="$MOBIUS_GH" build/build-repo.sh out/repo
-              if [ "$BUILD_ISO" = "true" ]; then MOBIUS_GH="$MOBIUS_GH" build/build-iso.sh out/repo out/iso; fi
+              if [ "$BUILD_ISO" = "true" ]; then MOBIUS_GH="$MOBIUS_GH" build/build-iso.sh out/iso; fi
             '
 
       - name: Publish the pacman repo
