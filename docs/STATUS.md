@@ -16,7 +16,7 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 | Installer safety rails | On a scratch disk: refuses a disk labeled GAMES, refuses `External HD 1` (label with spaces), refuses a mounted disk, refuses a wrong serial confirmation, leaves the disk untouched every time |
 | ISO | Builds (2.6 GB), boots in UEFI to the Mobius prompt, contains the installer and offline repo |
 | Installer, fresh mode, UEFI | Full run in a VM, no test shortcuts: partitioning, btrfs subvolumes, 992 packages (Steam, Wine, Lutris, LibreOffice...), user, services, snapper, Limine registered in UEFI NVRAM |
-| Installed system boots | Limine menu, linux-mobius kernel, greetd/tuigreet login, Hyprland session with Waybar, wallpaper and autostart |
+| Installed system boots | Limine (via its UEFI entry), linux-mobius kernel, greetd/tuigreet login, Hyprland session with Waybar, wallpaper and autostart |
 
 ## Bugs the tests caught (all fixed)
 - Installer silently exited when looking up the serial of a whole disk.
@@ -42,7 +42,7 @@ QEMU, UEFI (OVMF), 4 vCPU emulated, 30 GB disk. Booted the Mobius ISO and ran `m
 - `systemctl --failed`: nothing failed
 - Active: greetd, NetworkManager, ananicy-cpp, systemd-oomd, power-profiles-daemon, tailscaled
 - zram swap active, `ntsync` module loaded, `claude --version` = 2.1.292
-- Snapper took a timeline snapshot and it appeared in `limine.conf` under Snapshots, bootable
+- Snapper took a timeline snapshot and it appeared in `limine.conf` under Snapshots (booting a snapshot was not tested)
 - Logged in through tuigreet, Hyprland started: Mobius wallpaper, Waybar, Discord autostarted
 - Boot guard `post` check passes on the installed system
 
