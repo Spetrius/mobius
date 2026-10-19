@@ -53,10 +53,14 @@ jobs:
             '
 
       - name: Publish the pacman repo
+        # Also after a failure: whatever finished (e.g. the 2.5 h kernel) is kept,
+        # and the next run downloads it and skips rebuilding it.
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view repo >/dev/null 2>&1 || gh release create repo --title "Mobius package repo" --notes "pacman repo: Server = https://github.com/${{ github.repository }}/releases/download/repo"
+          [ -f out/repo/mobius.db.tar.zst ] || { echo "nothing built"; exit 0; }
           cd out/repo
           gh release upload repo --clobber *.pkg.tar.zst mobius.db mobius.db.tar.zst mobius.files mobius.files.tar.zst
 
