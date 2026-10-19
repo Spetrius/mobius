@@ -228,7 +228,11 @@ configure_system() {
     }
 
     # User: fish shell, groups for audio realtime, gamepads, Cowork VMs, gamemode
-    in_target useradd -m -G wheel,audio,video,input,kvm,gamemode -s /usr/bin/fish "$MOBIUS_USER"
+    local groups="" g
+    for g in wheel audio video input kvm gamemode; do
+        if (( DRY )) || arch-chroot "$T" getent group "$g" >/dev/null; then groups+="${groups:+,}$g"; fi
+    done
+    in_target useradd -m -G "$groups" -s /usr/bin/fish "$MOBIUS_USER"
     (( DRY )) || {
         echo "$MOBIUS_USER:$MOBIUS_PASS" | arch-chroot "$T" chpasswd
         echo "%wheel ALL=(ALL:ALL) ALL" > "$T/etc/sudoers.d/10-wheel"
