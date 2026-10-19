@@ -93,7 +93,8 @@ preflight() {
     [[ -n "${MOBIUS_TEST:-}" ]] && { say "TEST MODE: skipping UEFI and network checks"; return; }
     [[ -d /sys/firmware/efi/efivars ]] || die "not booted in UEFI mode (Limine setup here is UEFI only)"
     curl -fsI --max-time 10 https://archlinux.org >/dev/null 2>&1 || die "no network (Steam, Wine etc. come from Arch mirrors). Try: nmtui"
-    curl -fsIL --max-time 20 "$INSTALL_REPO_URL/mobius.db" >/dev/null 2>&1 \
+    # Real GET: release downloads redirect to signed storage URLs that reject HEAD (401)
+    curl -fsL --max-time 30 -o /dev/null "$INSTALL_REPO_URL/mobius.db" \
         || die "can't reach the Mobius package repo at $INSTALL_REPO_URL"
     timedatectl set-ntp true || true
 }
