@@ -19,8 +19,9 @@ PROTECTED_LABELS=("GAMES" "DATA1" "DATA2" "External HD 1" "External HD 2")
 TIMEZONE="${MOBIUS_TZ:-America/Los_Angeles}"
 LOCALE="en_US.UTF-8"
 KEYMAP="us"
-LOCAL_REPO="/opt/mobius-repo"                  # shipped on the ISO
 REMOTE_REPO_URL="@MOBIUS_REPO_URL@"            # filled in at ISO build time
+# Where this install pulls Mobius packages from. Override (e.g. file:///path) only for testing.
+INSTALL_REPO_URL="${MOBIUS_REPO_URL:-$REMOTE_REPO_URL}"
 BTRFS_OPTS="noatime,compress=zstd:1,space_cache=v2"
 SUBVOLS=("@:/" "@home:/home" "@root:/root" "@srv:/srv" "@cache:/var/cache" "@log:/var/log" "@tmp:/var/tmp")
 EXTRA_PKGS=(
@@ -91,8 +92,9 @@ preflight() {
     [[ $EUID -eq 0 ]] || die "run as root"
     [[ -n "${MOBIUS_TEST:-}" ]] && { say "TEST MODE: skipping UEFI and network checks"; return; }
     [[ -d /sys/firmware/efi/efivars ]] || die "not booted in UEFI mode (Limine setup here is UEFI only)"
-    [[ -d "$LOCAL_REPO" ]] || die "Mobius package repo not found at $LOCAL_REPO"
     curl -fsI --max-time 10 https://archlinux.org >/dev/null 2>&1 || die "no network (Steam, Wine etc. come from Arch mirrors). Try: nmtui"
+    curl -fsIL --max-time 20 "$INSTALL_REPO_URL/mobius.db" >/dev/null 2>&1 \
+        || die "can't reach the Mobius package repo at $INSTALL_REPO_URL"
     timedatectl set-ntp true || true
 }
 
@@ -199,9 +201,9 @@ EOF
 }
 
 install_packages() {
-    say "Installing packages (this downloads Steam, Wine, etc. from Arch mirrors)"
+    say "Installing packages (Mobius repo on GitHub + Arch mirrors, a few GB)"
     local conf=/tmp/pacman-install.conf
-    write_pacman_conf "$conf" "Server = file://$LOCAL_REPO"
+    write_pacman_conf "$conf" "Server = $INSTALL_REPO_URL"
     run pacman-key --init >/dev/null 2>&1 || true
     run pacman-key --populate archlinux >/dev/null 2>&1 || true
     run pacman -Sy --config "$conf"

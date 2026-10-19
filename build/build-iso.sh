@@ -1,16 +1,15 @@
 #!/bin/bash
-# Build the Mobius live/installer ISO. Run on Arch as root, after build-repo.sh.
-#   sudo build/build-iso.sh [repo-dir] [out-dir]
+# Build the Mobius live/installer ISO. Run on Arch as root.
+#   sudo build/build-iso.sh [out-dir]
 # The live system is Arch's releng profile (stock kernel, known-good on any hardware)
-# plus the Mobius installer and an offline copy of the Mobius package repo.
+# plus the Mobius installer. Mobius packages are downloaded from the published repo
+# during install (GitHub release assets max out at 2 GB, an offline copy made it 2.6 GB).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 source "$root/build/config.sh"
-repo="$(realpath "${1:-$root/out/repo}")"
-out="$(realpath -m "${2:-$root/out/iso}")"
+out="$(realpath -m "${1:-$root/out/iso}")"
 prof="$root/out/iso-profile"
 [[ $EUID -eq 0 ]] || { echo "run as root (mkarchiso needs it)"; exit 1; }
-[[ -f "$repo/mobius.db.tar.zst" ]] || { echo "no repo at $repo, run build-repo.sh first"; exit 1; }
 
 rm -rf "$prof"
 cp -a /usr/share/archiso/configs/releng "$prof"
@@ -31,17 +30,6 @@ sort -u -o "$prof/packages.x86_64" "$prof/packages.x86_64"
 # Installer, with the release repo URL baked in
 install -Dm755 "$root/installer/mobius-install" "$prof/airootfs/usr/local/bin/mobius-install"
 sed -i "s|@MOBIUS_REPO_URL@|$MOBIUS_REPO_URL|" "$prof/airootfs/usr/local/bin/mobius-install"
-
-# Offline Mobius repo (kernel, settings, metas, Claude, GE-Proton...)
-mkdir -p "$prof/airootfs/opt/mobius-repo"
-cp -a "$repo"/*.pkg.tar.zst "$repo"/mobius.db "$repo"/mobius.db.tar.zst "$repo"/mobius.files "$repo"/mobius.files.tar.zst "$prof/airootfs/opt/mobius-repo/"
-rm -f "$prof"/airootfs/opt/mobius-repo/*-debug-*.pkg.tar.zst
-# repo-add made symlinks; make them real files inside the image
-for f in mobius.db mobius.files; do
-    if [[ -L "$prof/airootfs/opt/mobius-repo/$f" ]]; then
-        cp --remove-destination "$repo/$f.tar.zst" "$prof/airootfs/opt/mobius-repo/$f"
-    fi
-done
 
 cat > "$prof/airootfs/etc/motd" <<'EOF'
 
