@@ -60,9 +60,12 @@ refuse_if_protected() { # $1 = block device (disk or partition)
     local lbl p
     while IFS= read -r lbl; do
         for p in "${PROTECTED_LABELS[@]}"; do
-            [[ "$lbl" == "$p" ]] && die "$1 holds the protected filesystem '$lbl'. Refusing to touch it."
+            if [[ "$lbl" == "$p" ]]; then
+                die "$1 holds the protected filesystem '$lbl'. Refusing to touch it."
+            fi
         done
     done < <(labels_on "$1")
+    return 0   # an unprotected label must not leave a false status behind (set -e)
 }
 
 refuse_if_mounted() { # $1 = block device; catches the boot USB and anything in use
@@ -97,6 +100,11 @@ preflight() {
     curl -fsL --max-time 30 -o /dev/null "$INSTALL_REPO_URL/mobius.db" \
         || die "can't reach the Mobius package repo at $INSTALL_REPO_URL"
     timedatectl set-ntp true || true
+    # A previous failed run leaves its target mounted; on the live ISO /mnt is only ours.
+    if (( ! DRY )) && mountpoint -q "$T"; then
+        say "Unmounting leftovers of a previous run from $T"
+        umount -R "$T"
+    fi
 }
 
 # ---------------------------------------------------------------- disks
