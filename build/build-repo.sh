@@ -27,15 +27,20 @@ already_built() {   # $1 = dir with PKGBUILD
 }
 
 install_build_deps() {  # $1 = dir with PKGBUILD
-    # Install makedepends/checkdepends, plus any depends the repos can already satisfy.
-    # Runtime deps that only exist later in this build (e.g. ntsync-autoload, provided by
-    # mobius-settings) are skipped; makepkg -d then doesn't insist on them.
-    local dep want=()
+    # Always install makedepends/checkdepends. Runtime depends only matter when the
+    # package compiles something (prepare/build/check); metas and repacks skip them, so
+    # they never drag unrelated packages (or conflicts) into the build environment.
+    # Deps the repos can't satisfy yet (built later in this run) are skipped; makepkg -d
+    # then doesn't insist on them.
+    local dep want=() kinds='\(make\|check\)depends'
+    if grep -qE '^[[:space:]]*(prepare|build|check)[[:space:]]*\(\)' "$1/PKGBUILD"; then
+        kinds='\(make\|check\)\?depends'
+    fi
     while read -r dep; do
         pacman -T "$dep" >/dev/null 2>&1 && continue                    # already installed
         pacman -Sp --print-format '%n' "$dep" >/dev/null 2>&1 && want+=("$dep")
     done < <(cd "$1" && makepkg --printsrcinfo \
-        | sed -n 's/^\t\(make\|check\)\?depends = //p' | sort -u)
+        | sed -n "s/^\t${kinds} = //p" | sort -u)
     if (( ${#want[@]} )); then
         sudo pacman -S --needed --noconfirm --asdeps "${want[@]}"
     fi
