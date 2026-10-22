@@ -1,5 +1,5 @@
 * { font-family: "JetBrainsMono Nerd Font"; font-size: 13px; }
-window#waybar { background: rgba(15, 15, 22, 0.85); color: #e0e0f0; }
-#workspaces button { padding: 0 8px; color: #8888a0; }
-#workspaces button.active { color: #40a0ff; border-bottom: 2px solid #c060ff; }
+window#waybar { background: rgba(12, 58, 0, 0.88); color: #e3f2dc; }
+#workspaces button { padding: 0 8px; color: #7a9970; }
+#workspaces button.active { color: #52cc33; border-bottom: 2px solid #1f9900; }
 #clock, #cpu, #memory, #custom-gpu, #pulseaudio, #network, #tray { padding: 0 10px; }

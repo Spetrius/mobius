@@ -5,5 +5,5 @@ size = 11.5
 opacity = 0.94
 padding = { x = 8, y = 6 }
 [colors.primary]
-background = "#15151c"
-foreground = "#e0e0f0"
+background = "#061d00"
+foreground = "#e3f2dc"

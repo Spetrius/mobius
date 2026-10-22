@@ -5,8 +5,8 @@ hl.config({
         gaps_out = 8,
         border_size = 2,
         col = {
-            active_border   = { colors = { "rgba(40a0ffee)", "rgba(c060ffee)" }, angle = 45 },
-            inactive_border = "rgba(404050aa)",
+            active_border   = { colors = { "rgba(52cc33ee)", "rgba(1f9900ee)" }, angle = 45 },
+            inactive_border = "rgba(0c3a00aa)",
         },
         resize_on_border = true,
         allow_tearing = true,   -- only applies to windows tagged immediate (games, see rules.lua)
@@ -15,7 +15,7 @@ hl.config({
     decoration = {
         rounding = 8,
         rounding_power = 2,
-        shadow = { enabled = true, range = 6, render_power = 3, color = 0xee111118 },
+        shadow = { enabled = true, range = 6, render_power = 3, color = 0xee030f00 },
         blur = { enabled = true, size = 4, passes = 2, vibrancy = 0.17 },
     },
     animations = { enabled = true },
