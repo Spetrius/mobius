@@ -37,8 +37,9 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 
 ## Not yet verified
 - **reuse mode over CachyOS specifically**: tested over a Mobius install in a VM, not over CachyOS's layout. Run `mobius-install --dry-run` first on the real machine.
+- **Installed on spetlin (2026-10-20)**: reuse mode over CachyOS worked, desktop and autostart came up. Helldivers 2 crashed mid-mission on Proton Experimental (STATUS_INVALID_HANDLE); GE-Proton being tested.
+- **Hyprland 0.56 `hyprctl dispatch` takes Lua**: hypridle's `dpms off` line was silently broken; fixed to `hl.dsp.dpms({ action = "off" })` (confirmed working on spetlin).
 - **Anything on real hardware**: RX 9060 XT under linux-mobius, monitor auto-detection by EDID name, Waybar GPU module, Steam/Proton games, Claude Desktop sign-in with the keyring.
-- **ISO publishing**: the ISO upload step hasn't succeeded on GitHub yet (it will once this fix is merged and a build runs).
 - Package signing: the `[mobius]` repo is unsigned (`SigLevel = Optional TrustAll`). Fine while it's only you, worth fixing before anyone else uses it.
 
 ## End-to-end VM test (2026-10-19)
