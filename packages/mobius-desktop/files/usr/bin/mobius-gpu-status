@@ -1,0 +1,19 @@
+#!/bin/bash
+# Waybar GPU module: busy % and junction temperature as JSON. Class "warning"/"critical"
+# when the GPU runs hot (busy at 100% is normal while gaming, so load alone never warns).
+dev=""
+for d in /sys/class/drm/card*/device; do [[ -r "$d/gpu_busy_percent" ]] && { dev="$d"; break; }; done
+[[ -n "$dev" ]] || { echo '{"text":"n/a"}'; exit 0; }
+busy="$(<"$dev/gpu_busy_percent")"
+temp=""
+for l in "$dev"/hwmon/hwmon*/temp*_label; do
+    [[ -r "$l" && "$(<"$l")" == junction ]] && temp=$(( $(<"${l%_label}_input") / 1000 ))
+done
+class=""
+if [[ -n "$temp" ]]; then
+    (( temp >= 100 )) && class=critical || { (( temp >= 90 )) && class=warning; }
+    text="$busy% ${temp}°C"
+else
+    text="$busy%"
+fi
+printf '{"text":"%s","class":"%s","tooltip":"GPU busy %s%%, junction %s°C"}\n' "$text" "$class" "$busy" "${temp:-?}"
