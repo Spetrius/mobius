@@ -3,10 +3,10 @@
 set -euo pipefail
 f="$HOME/.config/hypr/monitor-profile"
 case "${1:-show}" in
-    home|dad) echo "$1" > "$f" ;;
+    home|dad|laptop) echo "$1" > "$f" ;;
     auto)     rm -f "$f" ;;
     show)     echo "profile: $(cat "$f" 2>/dev/null || echo auto)"
               hyprctl monitors 2>/dev/null | grep -E '^Monitor|description' || true; exit 0 ;;
-    *)        echo "usage: mobius-monitors home|dad|auto|show"; exit 2 ;;
+    *)        echo "usage: mobius-monitors home|dad|laptop|auto|show"; exit 2 ;;
 esac
 hyprctl reload >/dev/null && echo "monitor profile: ${1}"

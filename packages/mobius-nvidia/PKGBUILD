@@ -1,0 +1,17 @@
+# NVIDIA for Mobius: open kernel modules built by DKMS against linux-mobius, plus PRIME offload
+# for hybrid laptops (Intel draws the desktop, games run on NVIDIA). RTX 20 series and newer.
+pkgname=mobius-nvidia
+pkgver=2026.10.22
+pkgrel=1
+pkgdesc='Mobius Linux NVIDIA support: open DKMS driver, 32-bit userspace, PRIME offload'
+arch=('any')
+license=('MIT')
+depends=(
+  nvidia-open-dkms dkms linux-mobius-headers
+  nvidia-utils lib32-nvidia-utils nvidia-settings nvidia-prime
+  egl-wayland libva-nvidia-driver
+)
+
+package() {
+  cp -a --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+}

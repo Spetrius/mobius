@@ -1,6 +1,6 @@
 # Mobius Linux
 
-A personal Arch-based distro for `spetlin` (Ryzen 7 5800X3D, RX 9060 XT). It does everything the old CachyOS install did, but every piece is ours: our kernel build, our tuning package, our Hyprland config, our installer, our package repo.
+A personal Arch-based distro for `spetlin` (Ryzen 7 5800X3D, RX 9060 XT) and a Lenovo Legion 5i laptop (i9-14900HX, RTX 4060). It does everything the old CachyOS install did, but every piece is ours: our kernel build, our tuning package, our Hyprland config, our installer, our package repo.
 
 Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and system tweaks are borrowed as source (they're GPL) and built here.
 
@@ -31,6 +31,7 @@ packages/            our packages (each a PKGBUILD)
   mobius-settings/     system tuning + boot guard + mobius-update
   mobius-desktop/      Hyprland/Waybar/etc. defaults in /etc/skel, greetd config
   mobius-gaming/       meta package: the gaming stack
+  mobius-nvidia/       NVIDIA open driver (DKMS) + PRIME offload, installed only on NVIDIA machines
   mobius-base/         meta package: base system, boot, tools, Claude
   claude-code/         Claude Code CLI (update.sh bumps it)
   claude-desktop/      Claude Desktop (update.sh verifies Anthropic's signed apt index)
@@ -69,6 +70,14 @@ Two modes:
 - **reuse**: installs onto your existing SSD's EFI + btrfs partitions. **Your `@home` is kept**, the old CachyOS root is renamed `@-old-<date>` (not deleted), the EFI partition is reformatted.
 
 The installer refuses to touch any disk holding GAMES, DATA1, DATA2, External HD 1 or External HD 2.
+
+It also checks the hardware and adds what that machine needs: Intel microcode, thermald and Intel GPU drivers on an Intel CPU, and `mobius-nvidia` on an NVIDIA GPU. The AMD desktop gets nothing extra.
+
+### Laptop (Legion 5i, hybrid graphics)
+- Leave the BIOS GPU mode on **Hybrid** (or Auto). The Intel GPU draws the desktop and the RTX 4060 powers off when idle, which is what gives decent battery life.
+- Games: Vulkan/DXVK/Proton games normally pick the RTX 4060 by themselves. If one runs on the Intel GPU, set its Steam launch option to `prime-run %command%`.
+- The **dGPU** MUX setting also works (Hyprland detects NVIDIA-only and sets the right variables) but battery life is much worse.
+- Brightness keys, touchpad (tap to click, natural scroll, 3-finger workspace swipe), battery and backlight in Waybar work out of the box.
 
 After a **reuse** install your old dotfiles are still in place, so you'll still have the CachyOS Hyprland config. To switch to the Mobius one (your old config is backed up, not deleted):
 

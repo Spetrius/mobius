@@ -1,5 +1,5 @@
--- Two desks, one config. The profile is picked from the monitors that are plugged in.
--- Force one with: mobius-monitors home | dad | auto   (writes ~/.config/hypr/monitor-profile)
+-- Two desks and a laptop, one config. The profile is picked from the monitors that are plugged in.
+-- Force one with: mobius-monitors home | dad | laptop | auto   (writes ~/.config/hypr/monitor-profile)
 -- Workspace 1 always lives on the main screen (DP-2), workspace 2 on the side screen (HDMI-A-1).
 
 local profiles = {
@@ -14,6 +14,11 @@ local profiles = {
         { output = "DP-2",     mode = "preferred", position = "0x0",    scale = 1 },
         -- LG ULTRAGEAR, right
         { output = "HDMI-A-1", mode = "preferred", position = "1920x0", scale = 1 },
+    },
+    laptop = {
+        -- Legion 5i built-in 16" 2560x1600 165 Hz (eDP-2 when the BIOS MUX is set to dGPU)
+        { output = "eDP-1", mode = "2560x1600@165", position = "0x0", scale = 1.25 },
+        { output = "eDP-2", mode = "2560x1600@165", position = "0x0", scale = 1.25 },
     },
 }
 
@@ -35,7 +40,9 @@ end
 local function detect()
     local ok, mons = pcall(hl.get_monitors)
     if not ok or not mons then return nil end
+    local laptop = false
     for _, m in ipairs(mons) do
+        if (m.name or ""):find("^eDP") then laptop = true end
         local d = (m.description or ""):upper()
         for name, keys in pairs(signatures) do
             for _, k in ipairs(keys) do
@@ -43,7 +50,8 @@ local function detect()
             end
         end
     end
-    return nil
+    -- A desk's monitors win; a built-in panel alone means the laptop
+    return laptop and "laptop" or nil
 end
 
 local current

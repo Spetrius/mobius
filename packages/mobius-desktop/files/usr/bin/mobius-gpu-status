@@ -3,7 +3,8 @@
 # when the GPU runs hot (busy at 100% is normal while gaming, so load alone never warns).
 dev=""
 for d in /sys/class/drm/card*/device; do [[ -r "$d/gpu_busy_percent" ]] && { dev="$d"; break; }; done
-[[ -n "$dev" ]] || { echo '{"text":"n/a"}'; exit 0; }
+# No AMD GPU (Intel/NVIDIA laptop): empty text hides the module
+[[ -n "$dev" ]] || { echo '{"text":""}'; exit 0; }
 busy="$(<"$dev/gpu_busy_percent")"
 temp=""
 for l in "$dev"/hwmon/hwmon*/temp*_label; do

@@ -2,8 +2,8 @@
 window#waybar { background: rgba(6, 32, 0, 0.90); color: #e0b050; }
 #workspaces button { padding: 0 8px; color: #7a9970; }
 #workspaces button.active { color: #e0b050; border-bottom: 2px solid #e0b050; }
-#clock, #cpu, #memory, #custom-gpu, #pulseaudio, #network, #tray { padding: 0 10px; }
+#clock, #cpu, #memory, #custom-gpu, #backlight, #battery, #pulseaudio, #network, #tray { padding: 0 10px; }
 /* Red only when something needs attention */
-#cpu.warning, #memory.warning, #custom-gpu.warning,
+#cpu.warning, #memory.warning, #custom-gpu.warning, #battery.warning:not(.charging),
 #pulseaudio.muted, #network.disconnected { color: #e05555; }
-#cpu.critical, #memory.critical, #custom-gpu.critical { color: #ff3b3b; font-weight: bold; }
+#cpu.critical, #memory.critical, #custom-gpu.critical, #battery.critical:not(.charging) { color: #ff3b3b; font-weight: bold; }

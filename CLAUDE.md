@@ -1,6 +1,6 @@
 # CLAUDE.md: Mobius Linux
 
-Personal Arch-based distro for one machine: `spetlin` (Ryzen 7 5800X3D, RX 9060 XT 16GB RDNA4, MSI X470, 32GB). Owner: `spetrius`. See README.md for the user-facing overview and docs/STATUS.md for what is verified.
+Personal Arch-based distro for `spetlin` (Ryzen 7 5800X3D, RX 9060 XT 16GB RDNA4, MSI X470, 32GB) and the owner's laptop (Lenovo Legion 5i Gen 9: i9-14900HX, RTX 4060 Laptop + Intel UHD hybrid, 16" 2560x1600 165 Hz). Owner: `spetrius`. See README.md for the user-facing overview and docs/STATUS.md for what is verified.
 
 ## Working with the owner
 - Shell is **fish**. For commands the owner types: `env VAR=value cmd`, loops end with `end`, no heredocs.
@@ -13,7 +13,8 @@ Personal Arch-based distro for one machine: `spetlin` (Ryzen 7 5800X3D, RX 9060 
 - Base: plain Arch + multilib + our `[mobius]` repo. **No CachyOS repos.** CachyOS kernel patches and settings are used as source only.
 - Kernel: `linux-mobius` = CachyOS `linux-cachyos-bore` PKGBUILD with pkgbase renamed, `_processor_opt=generic_v3`, compressed debug info. Never edit `packages/linux-mobius/PKGBUILD` by hand: change `sync-upstream.sh` and rerun it.
 - Hyprland 0.56 uses **Lua config natively** (hyprland.conf is the legacy path). Our config is in `packages/mobius-desktop/files/etc/skel/.config/hypr/*.lua`. **No UWSM**: autostart lives in `autostart.lua` (`hl.on("hyprland.start", ...)`), login is greetd + tuigreet running `start-hyprland`.
-- Workspace 1 = DP-2 (main), workspace 2 = HDMI-A-1 (side) at both desks. Monitor profile auto-detects by EDID description in `monitors.lua`.
+- Workspace 1 = DP-2 (main), workspace 2 = HDMI-A-1 (side) at both desks. Monitor profile auto-detects by EDID description in `monitors.lua`; a built-in `eDP` panel with no desk monitors means the `laptop` profile.
+- Hardware-specific packages are picked by `detect_hardware` in the installer: Intel CPU gets intel-ucode/thermald/Intel GPU drivers, an NVIDIA GPU gets `mobius-nvidia` (nvidia-open-dkms built against linux-mobius-headers, PRIME offload). Nothing in `mobius-base`/`mobius-gaming` is allowed to be vendor-specific beyond what is harmless on other hardware.
 - Boot: Limine via `limine-mkinitcpio-hook` (limine-entry-tool) + `limine-snapper-sync`. Kernels live under `/boot/<machine-id>/...`, cmdline in `/etc/default/limine`. Snapper uses the nested `@/.snapshots` layout.
 - Boot guard (`mobius-settings`): pre-transaction hook aborts kernel/initramfs/microcode changes if `/boot` is not a mounted vfat; post-transaction checks each kernel by sha256 on `/boot`.
 - Repo hosting: GitHub release `repo` on this repository. Release assets can't contain `:`, so `build-repo.sh` strips `epoch=` from AUR PKGBUILDs.
