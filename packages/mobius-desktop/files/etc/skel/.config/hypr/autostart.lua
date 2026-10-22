@@ -10,6 +10,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("mobius-wallpaper")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("udiskie --tray")
+    hl.exec_cmd("nm-applet --indicator")     -- Wi-Fi/network tray icon
+    hl.exec_cmd("blueman-applet")            -- Bluetooth tray icon
     hl.exec_cmd("wl-paste --watch cliphist store")
 
     hl.exec_cmd("discord")
