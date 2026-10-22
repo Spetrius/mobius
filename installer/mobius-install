@@ -31,6 +31,10 @@ EXTRA_PKGS=(
   calibre foliate
 )
 
+# Filled in by detect_hardware: packages and services this particular machine needs
+HW_PKGS=()
+HW_SERVICES=()
+
 DRY=0
 [[ "${1:-}" == "--dry-run" ]] && DRY=1
 T=/mnt
@@ -108,6 +112,29 @@ preflight() {
 }
 
 # ---------------------------------------------------------------- disks
+detect_hardware() {
+    # spetlin (AMD CPU + Radeon) needs nothing extra. Intel CPUs get microcode, thermald and the
+    # Intel GPU drivers (the iGPU draws the desktop on hybrid laptops); NVIDIA gets mobius-nvidia.
+    local d nvidia=0 what=()
+    if grep -q GenuineIntel /proc/cpuinfo; then
+        HW_PKGS+=(intel-ucode thermald vulkan-intel lib32-vulkan-intel intel-media-driver)
+        HW_SERVICES+=(thermald)
+        what+=("Intel CPU/GPU")
+    fi
+    for d in /sys/bus/pci/devices/*; do
+        if [[ "$(<"$d/class")" == 0x03* && "$(<"$d/vendor")" == 0x10de ]]; then nvidia=1; fi
+    done
+    if (( nvidia )); then
+        HW_PKGS+=(mobius-nvidia)
+        HW_SERVICES+=(nvidia-suspend nvidia-resume nvidia-hibernate)
+        what+=("NVIDIA GPU")
+    fi
+    if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then what+=("laptop battery"); fi
+    local list; list="$(printf '%s, ' "${what[@]}")"; list="${list%, }"
+    say "Hardware: ${list:-AMD desktop, nothing extra}"
+    return 0
+}
+
 pick_mode() {
     ask MOBIUS_MODE "Install mode: 'fresh' (wipe a whole disk) or 'reuse' (existing EFI + btrfs, keep @home)" "fresh"
     [[ "$MOBIUS_MODE" == fresh || "$MOBIUS_MODE" == reuse ]] || die "unknown mode $MOBIUS_MODE"
@@ -216,7 +243,7 @@ install_packages() {
     run pacman-key --init >/dev/null 2>&1 || true
     run pacman-key --populate archlinux >/dev/null 2>&1 || true
     run pacman -Sy --config "$conf"
-    local pkgs=(mobius-base mobius-desktop mobius-gaming "${EXTRA_PKGS[@]}")
+    local pkgs=(mobius-base mobius-desktop mobius-gaming "${EXTRA_PKGS[@]}" "${HW_PKGS[@]}")
     [[ -n "${MOBIUS_PKGS:-}" ]] && read -r -a pkgs <<< "$MOBIUS_PKGS"
     # A stalled mirror fails the download phase before anything is installed, so retrying
     # is safe; pacman also moves on to the next mirror in the list each time.
@@ -268,6 +295,7 @@ EOF
     in_target systemctl enable NetworkManager systemd-resolved systemd-timesyncd greetd \
         ananicy-cpp pci-latency systemd-oomd power-profiles-daemon fstrim.timer tailscaled \
         limine-snapper-sync snapper-timeline.timer snapper-cleanup.timer
+    if (( ${#HW_SERVICES[@]} )); then in_target systemctl enable "${HW_SERVICES[@]}"; fi
     run ln -sf /run/systemd/resolve/stub-resolv.conf "$T/etc/resolv.conf"
 }
 
@@ -316,6 +344,7 @@ main() {
     echo "${c_blu}Mobius Linux installer${c_rst}"
     (( DRY )) && echo "(dry run: nothing will be changed)"
     preflight
+    detect_hardware
     pick_mode
     ask MOBIUS_HOSTNAME "Hostname" "spetlin"
     ask MOBIUS_USER "Username" "spetrius"
