@@ -293,7 +293,7 @@ session  optional  pam_gnome_keyring.so auto_start
 EOF
 
     in_target systemctl enable NetworkManager systemd-resolved systemd-timesyncd greetd \
-        ananicy-cpp pci-latency systemd-oomd power-profiles-daemon fstrim.timer tailscaled \
+        ananicy-cpp pci-latency systemd-oomd power-profiles-daemon fstrim.timer tailscaled bluetooth \
         limine-snapper-sync snapper-timeline.timer snapper-cleanup.timer
     if (( ${#HW_SERVICES[@]} )); then in_target systemctl enable "${HW_SERVICES[@]}"; fi
     run ln -sf /run/systemd/resolve/stub-resolv.conf "$T/etc/resolv.conf"
