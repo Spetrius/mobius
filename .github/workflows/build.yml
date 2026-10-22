@@ -70,4 +70,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="iso-$(date +%Y.%m.%d)"
-          gh release create "$tag" out/iso/*.iso --title "Mobius Linux $(date +%Y.%m.%d)" --notes "Boot it, then run mobius-install."
+          # A second build on the same day replaces that day's ISO instead of failing
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" out/iso/*.iso --clobber
+          else
+            gh release create "$tag" out/iso/*.iso --title "Mobius Linux $(date +%Y.%m.%d)" --notes "Boot it, then run mobius-install."
+          fi
