@@ -1,17 +1,17 @@
 /* Mobius green for GTK 3 apps (Thunar, pavucontrol, file pickers).
-   Palette: deep #061d00, base #0c3a00, accent #1f9900, bright #52cc33, text #e3f2dc, dim #7a9970 */
+   Palette: deep #031000, base #062000, accent #136000, bright #3a9922, text #e3f2dc, dim #7a9970 */
 
 window, .background, dialog {
-    background-color: #061d00;
+    background-color: #031000;
     color: #e3f2dc;
 }
 
 /* Bars */
 headerbar, .titlebar, menubar, toolbar, .toolbar, .primary-toolbar, statusbar {
     background-image: none;
-    background-color: #0c3a00;
+    background-color: #062000;
     color: #e3f2dc;
-    border-color: #0c3a00;
+    border-color: #062000;
     box-shadow: none;
 }
 statusbar { color: #7a9970; }
@@ -19,61 +19,61 @@ statusbar { color: #7a9970; }
 /* Side pane (Thunar shortcuts / tree) */
 .sidebar, placessidebar, placessidebar list, .shortcuts-pane, .shortcuts-pane treeview.view,
 .sidebar treeview.view, .sidebar row {
-    background-color: #0c3a00;
+    background-color: #062000;
     color: #e3f2dc;
 }
 
 /* File views and lists */
 .view, treeview.view, iconview, list, row, textview text, scrolledwindow viewport {
-    background-color: #061d00;
+    background-color: #031000;
     color: #e3f2dc;
 }
 treeview.view header button {
     background-image: none;
-    background-color: #0c3a00;
+    background-color: #062000;
     color: #7a9970;
-    border-color: #061d00;
+    border-color: #031000;
 }
 
 /* Selection */
 .view:selected, treeview.view:selected, iconview:selected, row:selected,
 .view:selected:focus, treeview.view:selected:focus, iconview:selected:focus, row:selected:focus,
 *:selected, selection {
-    background-color: #1f9900;
+    background-color: #136000;
     color: #ffffff;
 }
-.view:hover, iconview:hover, row:hover { background-color: #0c3a00; }
+.view:hover, iconview:hover, row:hover { background-color: #062000; }
 
 /* Inputs and buttons */
 entry {
     background-image: none;
-    background-color: #0c3a00;
+    background-color: #062000;
     color: #e3f2dc;
-    border-color: #1f9900;
-    caret-color: #52cc33;
+    border-color: #136000;
+    caret-color: #3a9922;
 }
-entry:focus { border-color: #52cc33; box-shadow: inset 0 0 0 1px #52cc33; }
+entry:focus { border-color: #3a9922; box-shadow: inset 0 0 0 1px #3a9922; }
 button {
     background-image: none;
-    background-color: #0c3a00;
+    background-color: #062000;
     color: #e3f2dc;
-    border-color: #1f9900;
+    border-color: #136000;
     text-shadow: none;
     box-shadow: none;
 }
-button:hover { background-color: #145c00; }
-button:active, button:checked { background-color: #1f9900; color: #ffffff; }
+button:hover { background-color: #0b3300; }
+button:active, button:checked { background-color: #136000; color: #ffffff; }
 
 /* Menus and popovers */
 menu, .menu, .context-menu, popover, popover.background, menuitem {
-    background-color: #0c3a00;
+    background-color: #062000;
     color: #e3f2dc;
 }
-menuitem:hover { background-color: #1f9900; color: #ffffff; }
+menuitem:hover { background-color: #136000; color: #ffffff; }
 
 /* Scrollbars, separators, links */
-scrollbar { background-color: #061d00; border-color: #061d00; }
-scrollbar slider { background-color: #1f9900; }
-scrollbar slider:hover { background-color: #52cc33; }
-separator, paned separator { background-color: #0c3a00; }
-link, *:link { color: #52cc33; }
+scrollbar { background-color: #031000; border-color: #031000; }
+scrollbar slider { background-color: #136000; }
+scrollbar slider:hover { background-color: #3a9922; }
+separator, paned separator { background-color: #062000; }
+link, *:link { color: #3a9922; }
