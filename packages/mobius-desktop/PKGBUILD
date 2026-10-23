@@ -1,7 +1,7 @@
 # Mobius desktop: Hyprland (Lua config, no UWSM), greetd login, default user config in /etc/skel.
 pkgname=mobius-desktop
 pkgver=2026.10.18
-pkgrel=9
+pkgrel=10
 pkgdesc='Mobius Linux Hyprland desktop and default configs'
 arch=('any')
 license=('MIT')
@@ -12,6 +12,7 @@ depends=(
   thunar thunar-volman gvfs tumbler udiskie
   grim slurp wl-clipboard cliphist playerctl pavucontrol network-manager-applet brightnessctl
   bluez bluez-utils blueman
+  proton-vpn-gtk-app
   qt5-wayland qt6-wayland qt6ct nwg-look
   pipewire pipewire-pulse pipewire-alsa wireplumber
   ttf-jetbrains-mono-nerd noto-fonts noto-fonts-cjk noto-fonts-emoji
