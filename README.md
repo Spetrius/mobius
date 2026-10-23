@@ -14,6 +14,7 @@ Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and syste
 | Desktop | Hyprland 0.56 with a Lua config written for this machine, **no UWSM**, greetd + tuigreet login, Waybar, Mako, Fuzzel, Alacritty, fish |
 | Gaming | Steam, GE-Proton (packaged in our repo), Lutris, Wine Staging, umu, protontricks, GameMode, MangoHud, gamescope, RADV only, LACT, amdgpu_top |
 | Claude | Claude Code CLI and Claude Desktop, both repacked from Anthropic's official builds, updated through pacman |
+| VPN | Proton VPN (Arch's `proton-vpn-gtk-app`), starts minimized to the tray at login |
 
 ### Things it fixes from the old setup
 - **Boot guard.** pacman refuses to touch kernels if `/boot` isn't mounted, and after every update it checks that each kernel really landed on the EFI partition. That's the Sep 29 failure, blocked automatically.
