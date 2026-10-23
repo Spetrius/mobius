@@ -1,0 +1,11 @@
+#!/bin/bash
+# Power menu (Waybar power button, Super+Escape): lock, log out, suspend, reboot, shut down.
+choice="$(printf '%s\n' "Lock" "Suspend" "Log out" "Reboot" "Shut down" \
+    | fuzzel --dmenu --prompt "Power: " --lines 5 --width 20)" || exit 0
+case "$choice" in
+    "Lock")      loginctl lock-session ;;
+    "Suspend")   systemctl suspend ;;
+    "Log out")   hyprctl dispatch 'hl.dsp.exit()' ;;
+    "Reboot")    systemctl reboot ;;
+    "Shut down") systemctl poweroff ;;
+esac

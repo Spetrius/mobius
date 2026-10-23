@@ -3,7 +3,7 @@
   "height": 30,
   "modules-left": ["hyprland/workspaces", "hyprland/window"],
   "modules-center": ["clock"],
-  "modules-right": ["custom/gpu", "cpu", "memory", "backlight", "battery", "pulseaudio", "network", "tray"],
+  "modules-right": ["custom/gpu", "cpu", "memory", "backlight", "battery", "pulseaudio", "network", "tray", "custom/power"],
   "hyprland/workspaces": { "format": "{id}", "on-click": "activate" },
   "hyprland/window": { "max-length": 60 },
   "clock": { "format": "{:%a %b %d  %H:%M}", "tooltip-format": "{calendar}" },
@@ -22,5 +22,6 @@
   },
   "pulseaudio": { "format": "\uf028 {volume}%", "format-muted": "\uf6a9 muted", "on-click": "pavucontrol" },
   "network": { "format-ethernet": "󰈀 {ipaddr}", "format-wifi": "\uf1eb {essid}", "format-disconnected": "offline" },
-  "tray": { "spacing": 8 }
+  "tray": { "spacing": 8 },
+  "custom/power": { "format": "\uf011", "on-click": "mobius-power-menu", "tooltip-format": "Power menu (Super+Escape)" }
 }
