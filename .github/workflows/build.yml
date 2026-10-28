@@ -38,6 +38,7 @@ jobs:
           gh release download repo -D out/repo -R "${{ github.repository }}" || echo "no repo release yet"
 
       - name: Build packages and ISO in an Arch container
+        id: build
         run: |
           docker run --rm --privileged -v "$PWD:/src" -w /src \
             -e MOBIUS_GH="${{ github.repository }}" -e BUILD_ISO="${{ github.event_name == 'schedule' || inputs.iso }}" \
@@ -52,9 +53,20 @@ jobs:
               if [ "$BUILD_ISO" = "true" ]; then MOBIUS_GH="$MOBIUS_GH" build/build-iso.sh out/iso; fi
             '
 
+      - name: Test the repo before publishing
+        # Dependencies resolve, Hyprland config verifies, scripts parse. See build/test-repo.sh.
+        id: test
+        if: always() && hashFiles('out/repo/mobius.db.tar.zst') != ''
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src archlinux:base-devel bash -euxc '
+              pacman -Sy --noconfirm --needed archlinux-keyring python
+              build/test-repo.sh out/repo
+            '
+
       - name: Publish the pacman repo
-        # Also after a failure: whatever finished (e.g. the 2.5 h kernel) is kept,
-        # and the next run downloads it and skips rebuilding it.
+        # Tests passed: publish everything. Otherwise upload only the package files (not the
+        # database, so machines never see them) to keep finished work such as the 2.5 h kernel:
+        # the next run downloads them and skips rebuilding.
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,10 +74,16 @@ jobs:
           gh release view repo >/dev/null 2>&1 || gh release create repo --title "Mobius package repo" --notes "pacman repo: Server = https://github.com/${{ github.repository }}/releases/download/repo"
           [ -f out/repo/mobius.db.tar.zst ] || { echo "nothing built"; exit 0; }
           cd out/repo
-          gh release upload repo --clobber *.pkg.tar.zst mobius.db mobius.db.tar.zst mobius.files mobius.files.tar.zst
+          if [ "${{ steps.test.outcome }}" = success ]; then
+            gh release upload repo --clobber *.pkg.tar.zst mobius.db mobius.db.tar.zst mobius.files mobius.files.tar.zst
+          else
+            gh release upload repo --clobber *.pkg.tar.zst
+            echo "::error::Tests did not pass: packages cached, repo database NOT published"
+            exit 1
+          fi
 
       - name: Publish the ISO
-        if: github.event_name == 'schedule' || inputs.iso
+        if: success() && (github.event_name == 'schedule' || inputs.iso)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
