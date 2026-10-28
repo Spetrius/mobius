@@ -1,0 +1,59 @@
+# Weekly: move the kernel to CachyOS's current linux-cachyos-bore and the pinned AUR packages to
+# their current commits, and open a pull request with the result. Nothing is built or published
+# until the owner merges it (the build then runs from main as usual).
+name: bump
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 8 * * 6"   # Saturday 01:41 Pacific, the day before the weekly build
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kernel from CachyOS
+        id: kernel
+        run: |
+          old="$(grep -m1 '^_major=' packages/linux-mobius/PKGBUILD | cut -d= -f2).$(grep -m1 '^_minor=' packages/linux-mobius/PKGBUILD | cut -d= -f2)"
+          packages/linux-mobius/sync-upstream.sh
+          # Same upstream content (only the "GENERATED from <commit>" header moved): no change
+          if git diff --quiet -I '^# GENERATED' -- packages/linux-mobius; then git checkout -- packages/linux-mobius; fi
+          new="$(grep -m1 '^_major=' packages/linux-mobius/PKGBUILD | cut -d= -f2).$(grep -m1 '^_minor=' packages/linux-mobius/PKGBUILD | cut -d= -f2)"
+          echo "summary=linux-mobius $old -> $new" >> "$GITHUB_OUTPUT"
+
+      - name: AUR packages
+        id: aur
+        run: |
+          cp packages/aur.list /tmp/aur.old
+          build/bump-aur.sh
+          {
+            echo 'summary<<EOF'
+            join -j1 <(sort /tmp/aur.old | grep -v '^#') <(sort packages/aur.list | grep -v '^#') \
+              | awk '$2 != $3 {printf "- %s: [%s...%s](https://aur.archlinux.org/cgit/aur.git/diff/?h=%s&id=%s&id2=%s)\n", $1, substr($2,1,8), substr($3,1,8), $1, $3, $2}'
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then echo "Nothing to bump this week."; exit 0; fi
+          git config user.name "mobius-bump"
+          git config user.email "mobius-bump@users.noreply.github.com"
+          git checkout -B bump/weekly
+          git commit -qam "Weekly bump: ${{ steps.kernel.outputs.summary }}, AUR pins"
+          git push -f origin bump/weekly
+          body="$(printf 'Automatic weekly bump. Merge it, then the build runs as usual.\n\n**Kernel:** %s\n\n**AUR** (click to review the upstream PKGBUILD changes):\n%s\n' \
+            "${{ steps.kernel.outputs.summary }}" "${{ steps.aur.outputs.summary }}")"
+          if gh pr view bump/weekly --json state -q .state 2>/dev/null | grep -q OPEN; then
+            gh pr edit bump/weekly --body "$body"
+          else
+            gh pr create --head bump/weekly --base main --title "Weekly bump: kernel and AUR packages" --body "$body"
+          fi

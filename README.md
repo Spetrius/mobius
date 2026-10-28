@@ -60,6 +60,10 @@ sudo build/build-iso.sh        # writes out/iso/mobius-*.iso
 
 Or let GitHub build it: Actions tab, `build`, Run workflow. The repo is published as the `repo` release and the ISO as `iso-<date>`.
 
+Every build is tested before it is published (`build/test-repo.sh`): all Mobius packages must resolve against current Arch, the default Hyprland config must pass `Hyprland --verify-config`, and every script must parse. If a test fails the repo database is not updated, so no machine ever sees a broken set.
+
+Every Saturday the `bump` workflow syncs the kernel with CachyOS and the pinned AUR packages with the AUR, and opens a pull request (with links to the upstream changes). Merging it is the only step.
+
 ## Installing
 
 1. Write the ISO to a USB stick, boot it (UEFI).
