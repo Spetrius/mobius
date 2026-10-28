@@ -1,0 +1,8 @@
+[Unit]
+Description=Mobius nightly home backup to DATA1
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mobius-backup run
+Nice=10
+IOSchedulingClass=idle
