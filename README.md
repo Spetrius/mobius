@@ -102,6 +102,7 @@ mobius-skel-sync --force
 | `mobius-monitors home/dad/auto` | monitor profile |
 | `mobius-skel-sync` | bring configs up to the Mobius defaults; files you edited are kept and listed (`--diff F` / `--take F`). `mobius-update` runs it for you |
 | `mobius-backup init` / `now` / `status` / `list` / `browse` / `restore PATH` | nightly encrypted home backup to the DATA1 drive (only ever to a mounted DATA1, never your system drive) |
+| `mobius-secureboot` / `sudo mobius-secureboot setup` | Secure Boot status / one-time setup with your own keys (instructions inside: BIOS to Setup Mode first) |
 | `limine-snapper-list` | list bootable snapshots |
 | `sudo limine-snapper-restore` | roll back after booting a snapshot |
 | `game-performance %command%` | Steam launch option: performance power profile while the game runs |
