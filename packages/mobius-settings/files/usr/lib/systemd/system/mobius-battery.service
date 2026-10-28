@@ -1,0 +1,11 @@
+[Unit]
+Description=Mobius: reapply the saved battery charge limit
+ConditionPathExists=/etc/mobius/battery-limit
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/mobius-battery --boot
+
+[Install]
+WantedBy=multi-user.target

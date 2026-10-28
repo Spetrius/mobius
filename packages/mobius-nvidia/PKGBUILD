@@ -2,7 +2,7 @@
 # for hybrid laptops (Intel draws the desktop, games run on NVIDIA). RTX 20 series and newer.
 pkgname=mobius-nvidia
 pkgver=2026.10.22
-pkgrel=1
+pkgrel=2
 pkgdesc='Mobius Linux NVIDIA support: open DKMS driver, 32-bit userspace, PRIME offload'
 arch=('any')
 license=('MIT')

@@ -129,7 +129,10 @@ detect_hardware() {
         HW_SERVICES+=(nvidia-suspend nvidia-resume nvidia-hibernate)
         what+=("NVIDIA GPU")
     fi
-    if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then what+=("laptop battery"); fi
+    if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then
+        HW_SERVICES+=(mobius-battery)   # reapplies the charge limit chosen with mobius-battery (off until then)
+        what+=("laptop battery")
+    fi
     local list; list="$(printf '%s, ' "${what[@]}")"; list="${list%, }"
     say "Hardware: ${list:-AMD desktop, nothing extra}"
     return 0
