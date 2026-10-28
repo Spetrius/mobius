@@ -1,0 +1,52 @@
+#!/bin/bash
+# Laptop battery charge limit, to make the battery last more years when the laptop lives on the charger.
+#   mobius-battery           show the current state
+#   mobius-battery on        stop charging early (about 80%, or Lenovo's conservation level)
+#   mobius-battery off       charge to 100% (do this the night before a trip)
+# The choice is saved in /etc/mobius/battery-limit and reapplied at every boot.
+set -euo pipefail
+conf=/etc/mobius/battery-limit
+LIMIT=80
+
+bat="$(ls -d /sys/class/power_supply/BAT* 2>/dev/null | head -1 || true)"
+ideapad="$(ls /sys/bus/platform/drivers/ideapad_acpi/*/conservation_mode 2>/dev/null | head -1 || true)"
+
+method() {
+    if [[ -n "$bat" && -e "$bat/charge_control_end_threshold" ]]; then echo threshold
+    elif [[ -n "$bat" && -e "$bat/charge_types" ]] && grep -q Long_Life "$bat/charge_types"; then echo charge_types
+    elif [[ -n "$ideapad" ]]; then echo ideapad
+    else echo none; fi
+}
+
+apply() { # $1 = on|off   (runs as root)
+    case "$(method)" in
+        threshold)    echo $([[ $1 == on ]] && echo $LIMIT || echo 100) > "$bat/charge_control_end_threshold" ;;
+        charge_types) echo $([[ $1 == on ]] && echo Long_Life || echo Standard) > "$bat/charge_types" ;;
+        ideapad)      echo $([[ $1 == on ]] && echo 1 || echo 0) > "$ideapad" ;;
+        none)         echo "This laptop exposes no charge limit to Linux."; return 1 ;;
+    esac
+}
+
+show() {
+    [[ -n "$bat" ]] || { echo "No battery found."; exit 0; }
+    echo "Battery: $(cat "$bat/capacity")% ($(cat "$bat/status"))"
+    case "$(method)" in
+        threshold)    echo "Charge limit: stops at $(cat "$bat/charge_control_end_threshold")%" ;;
+        charge_types) m="$(grep -o '\[[A-Za-z_]*\]' "$bat/charge_types" | tr -d '[]' || true)"
+                      echo "Charge mode: ${m:-$(cat "$bat/charge_types")} (Long_Life = limited)" ;;
+        ideapad)      [[ "$(cat "$ideapad")" == 1 ]] && echo "Conservation mode: on (Lenovo stops charging around 60-80%)" \
+                                                     || echo "Conservation mode: off (charges to 100%)" ;;
+        none)         echo "This laptop exposes no charge limit to Linux." ;;
+    esac
+    echo "Saved setting: $(cat "$conf" 2>/dev/null || echo off)"
+}
+
+case "${1:-show}" in
+    show)    show ;;
+    on|off)  if [[ $EUID -ne 0 ]]; then exec sudo "$0" "$1"; fi
+             mkdir -p /etc/mobius; echo "$1" > "$conf"; apply "$1"
+             systemctl enable --quiet mobius-battery.service 2>/dev/null || true
+             show ;;
+    --boot)  [[ -f "$conf" ]] && apply "$(cat "$conf")" || true ;;
+    *)       echo "usage: mobius-battery [on|off]"; exit 2 ;;
+esac

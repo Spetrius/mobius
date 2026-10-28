@@ -1,0 +1,9 @@
+# Syncthing runs as a per-user service; enable it for every user (idempotent).
+post_install() {
+  systemctl --global enable syncthing.service >/dev/null 2>&1 || true
+  echo ":: Syncthing: open http://127.0.0.1:8384 to add devices and folders."
+  echo ":: Already logged in? Start it now with: systemctl --user start syncthing"
+}
+post_upgrade() {
+  systemctl --global enable syncthing.service >/dev/null 2>&1 || true
+}

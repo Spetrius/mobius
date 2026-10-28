@@ -1,7 +1,7 @@
 # The Mobius base system on top of Arch's "base".
 pkgname=mobius-base
 pkgver=2026.10.18
-pkgrel=2
+pkgrel=3
 pkgdesc='Mobius Linux base: kernel, boot, snapshots, tuning, networking, tools, Claude'
 arch=('any')
 license=('MIT')
@@ -16,6 +16,8 @@ depends=(
   # Shell and everyday tools
   fish git nano sudo man-db man-pages htop btop jq bc wget curl rsync
   smartmontools ntfs-3g exfatprogs dosfstools
+  # Firmware updates (SSDs, docks, peripherals) and security advisories for installed packages
+  fwupd arch-audit
   # AUR helper (built from source)
   paru
   # Containers / apps

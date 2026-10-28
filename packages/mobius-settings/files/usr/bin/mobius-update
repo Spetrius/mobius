@@ -1,12 +1,18 @@
 #!/bin/bash
 # Safe full update: the standing update rule from the old CachyOS install, automated.
-#   1. /boot must be mounted   2. full -Syu (never partial)   3. AUR updates
-#   4. verify kernels landed   5. tell you if a reboot is needed
+#   1. Arch news check   2. /boot must be mounted   3. full -Syu (never partial)   4. AUR updates
+#   5. verify kernels landed   6. new Mobius config defaults   7. security and firmware report
+#   8. tell you if a reboot is needed
 set -euo pipefail
 [[ $EUID -eq 0 ]] && { echo "Run as your user, not root (it calls sudo itself)."; exit 1; }
 
+if ! /usr/lib/mobius/arch-news; then
+    read -r -p "Read the news above first if it applies to you. Continue with the update? [Y/n] " a
+    [[ "${a:-y}" =~ ^[Yy]$ ]] || { echo "Update skipped. Run mobius-update again when ready."; exit 0; }
+fi
+
 /usr/lib/mobius/boot-guard pre
-before="$(pacman -Q linux-mobius mesa linux-firmware amd-ucode 2>/dev/null || true)"
+before="$(pacman -Q linux-mobius mesa linux-firmware amd-ucode intel-ucode nvidia-open-dkms 2>/dev/null || true)"
 
 if ! sudo pacman -Syu; then
     echo "pacman failed. If it was a keyring error, run:"
@@ -16,7 +22,33 @@ fi
 command -v paru >/dev/null && paru -Sua
 
 sudo /usr/lib/mobius/boot-guard post
-after="$(pacman -Q linux-mobius mesa linux-firmware amd-ucode 2>/dev/null || true)"
+
+# New Mobius defaults for configs you never edited (yours are kept and listed)
+if command -v mobius-skel-sync >/dev/null; then
+    echo ":: Mobius config defaults"
+    mobius-skel-sync || true
+fi
+
+# Security: installed packages with known vulnerabilities. After a full update anything listed
+# is waiting on a fix from Arch, nothing to do but know about it.
+if command -v arch-audit >/dev/null; then
+    vuln="$(arch-audit -f '%n (%s, %c)' 2>/dev/null || true)"
+    if [[ -n "$vuln" ]]; then
+        echo ":: Known vulnerabilities still unfixed upstream ($(wc -l <<<"$vuln") packages):"
+        sed 's/^/   /' <<<"$vuln" | head -15
+    fi
+fi
+
+# Firmware (SSDs, docks, peripherals; some laptops' BIOS)
+if command -v fwupdmgr >/dev/null; then
+    fwupdmgr refresh >/dev/null 2>&1 || true
+    if fwupdmgr get-updates --no-unreported-check >/dev/null 2>&1; then
+        echo ":: Firmware updates available. See them with: fwupdmgr get-updates"
+        echo "   Install with: fwupdmgr update"
+    fi
+fi
+
+after="$(pacman -Q linux-mobius mesa linux-firmware amd-ucode intel-ucode nvidia-open-dkms 2>/dev/null || true)"
 if [[ "$before" != "$after" ]]; then
-    echo "Kernel, mesa, firmware or microcode changed: reboot when convenient."
+    echo "Kernel, graphics driver, firmware or microcode changed: reboot when convenient."
 fi

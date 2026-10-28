@@ -1,0 +1,53 @@
+#!/bin/bash
+# Check the NVIDIA setup on a hybrid laptop. Read-only; safe to run any time.
+ok()   { printf '  \e[1;32mok\e[0m    %s\n' "$*"; }
+bad()  { printf '  \e[1;31mFAIL\e[0m  %s\n' "$*"; fails=$((fails+1)); }
+note() { printf '  \e[1;33mnote\e[0m  %s\n' "$*"; }
+fails=0
+
+echo "Driver"
+if [[ -r /proc/driver/nvidia/version ]]; then
+    ok "NVIDIA driver loaded: $(sed -n 's/.*Kernel Module *\([0-9.]*\).*/\1/p' /proc/driver/nvidia/version | head -1)"
+else
+    bad "NVIDIA driver not loaded (sudo dkms status, then reboot after mobius-update)"
+fi
+if grep -q 'PreserveVideoMemoryAllocations: 1' /proc/driver/nvidia/params 2>/dev/null; then
+    ok "video memory preserved across sleep"
+else
+    bad "PreserveVideoMemoryAllocations is off (sleep may corrupt the screen)"
+fi
+for s in nvidia-suspend nvidia-resume nvidia-hibernate; do
+    systemctl is-enabled --quiet "$s" 2>/dev/null && ok "$s enabled" || bad "$s not enabled: sudo systemctl enable $s"
+done
+
+echo "Hybrid graphics"
+for d in /sys/bus/pci/devices/*; do
+    [[ "$(<"$d/class")" == 0x03* ]] || continue
+    case "$(<"$d/vendor")" in
+        0x8086) ok "Intel GPU present ($(basename "$d"))" ;;
+        0x10de) st="$(<"$d/power/runtime_status")"; ctl="$(<"$d/power/control")"
+                [[ "$ctl" == auto ]] && ok "NVIDIA power management on (now: $st)" \
+                                     || bad "NVIDIA power control is '$ctl', it never sleeps (battery drain)"
+                [[ "$st" == suspended ]] && ok "NVIDIA GPU asleep while idle" \
+                                         || note "NVIDIA GPU awake ($st); fine if a game or nvidia-smi is running" ;;
+    esac
+done
+for c in /sys/class/drm/card*-eDP-*; do
+    [[ -e "$c" ]] || continue
+    v="$(<"$(dirname "$c")/$(basename "$c" | cut -d- -f1)/device/vendor")"
+    [[ "$v" == 0x8086 ]] && ok "built-in screen driven by the Intel GPU (Hybrid mode)" \
+                         || note "built-in screen driven by $v (dGPU mode: fine, but more battery use)"
+done
+
+echo "Offload"
+if command -v prime-run >/dev/null && command -v vulkaninfo >/dev/null; then
+    gpu="$(prime-run vulkaninfo --summary 2>/dev/null | sed -n 's/^\s*deviceName *= *//p' | head -1)"
+    [[ "$gpu" == *NVIDIA* ]] && ok "prime-run reaches the NVIDIA GPU: $gpu" || bad "prime-run did not reach NVIDIA (got: ${gpu:-nothing})"
+fi
+
+echo
+(( fails )) && echo "$fails problem(s). Send this output to Claude." || echo "All automatic checks passed."
+echo "Still worth trying by hand:"
+echo "  1. Sleep: close the lid (no monitor plugged in), wait 30 s, open it. Screen and Wi-Fi should come back."
+echo "  2. A game: Steam launch options 'mangohud %command%'. The overlay should name the RTX 4060."
+echo "     If it shows Intel graphics, use 'prime-run mangohud %command%' for that game."

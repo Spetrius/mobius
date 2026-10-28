@@ -68,5 +68,26 @@ apply()
 hl.on("monitor.added", apply)
 hl.on("hyprland.start", apply)
 
+-- Laptop lid: closing it with an external monitor plugged in turns the built-in screen off
+-- (logind doesn't suspend while docked); opening it turns the screen back on. With no external
+-- monitor, closing the lid suspends as usual.
+local function lid(closed)
+    local ok, mons = pcall(hl.get_monitors)
+    if not ok or not mons then return end
+    local external = false
+    for _, m in ipairs(mons) do
+        if not (m.name or ""):find("^eDP") then external = true end
+    end
+    for _, spec in ipairs(profiles.laptop) do
+        if not closed then
+            hl.monitor(spec)
+        elseif external then
+            hl.monitor({ output = spec.output, disabled = true })
+        end
+    end
+end
+hl.bind("switch:on:Lid Switch",  function() lid(true) end,  { locked = true })
+hl.bind("switch:off:Lid Switch", function() lid(false) end, { locked = true })
+
 hl.workspace_rule({ workspace = "1", monitor = "DP-2",     default = true, persistent = true })
 hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-1", default = true, persistent = true })

@@ -15,6 +15,7 @@ Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and syste
 | Gaming | Steam, GE-Proton (packaged in our repo), Lutris, Wine Staging, umu, protontricks, GameMode, MangoHud, gamescope, RADV only, LACT, amdgpu_top |
 | Claude | Claude Code CLI and Claude Desktop, both repacked from Anthropic's official builds, updated through pacman |
 | VPN | Proton VPN (Arch's `proton-vpn-gtk-app`), starts minimized to the tray at login |
+| Apps | `mobius-apps`: KDE Connect (phone link), Syncthing (folder sync), darktable, RawTherapee, GIMP, gphoto2, Anki, Obsidian, Xournal++ |
 
 ### Things it fixes from the old setup
 - **Boot guard.** pacman refuses to touch kernels if `/boot` isn't mounted, and after every update it checks that each kernel really landed on the EFI partition. That's the Sep 29 failure, blocked automatically.
@@ -83,6 +84,9 @@ It also checks the hardware and adds what that machine needs: Intel microcode, t
 - Games: Vulkan/DXVK/Proton games normally pick the RTX 4060 by themselves. If one runs on the Intel GPU, set its Steam launch option to `prime-run %command%`.
 - The **dGPU** MUX setting also works (Hyprland detects NVIDIA-only and sets the right variables) but battery life is much worse.
 - Brightness keys, touchpad (tap to click, natural scroll, 3-finger workspace swipe), battery and backlight in Waybar work out of the box.
+- `mobius-battery on` stops charging early (Lenovo conservation mode) so the battery lasts more years on the charger; `mobius-battery off` the night before a trip. Remembered across reboots.
+- Closing the lid with an external monitor plugged in turns the built-in screen off instead of sleeping; opening it turns the screen back on.
+- `mobius-gpu-check` checks the NVIDIA setup (driver, sleep support, GPU power saving, prime-run) and lists the two things to try by hand.
 
 After a **reuse** install your old dotfiles are still in place, so you'll still have the CachyOS Hyprland config. To switch to the Mobius one (your old config is backed up, not deleted):
 
@@ -94,12 +98,27 @@ mobius-skel-sync --force
 
 | Command | Does |
 |---|---|
-| `mobius-update` (or `up` in fish) | safe full system update |
+| `mobius-update` (or `up` in fish) | safe full system update: Arch news first, then update, new config defaults, vulnerability and firmware report |
 | `mobius-monitors home/dad/auto` | monitor profile |
-| `mobius-skel-sync` | copy any Mobius default configs you don't have yet |
+| `mobius-skel-sync` | bring configs up to the Mobius defaults; files you edited are kept and listed (`--diff F` / `--take F`). `mobius-update` runs it for you |
 | `limine-snapper-list` | list bootable snapshots |
 | `sudo limine-snapper-restore` | roll back after booting a snapshot |
 | `game-performance %command%` | Steam launch option: performance power profile while the game runs |
+
+## Keys
+
+| Keys | Does |
+|---|---|
+| Super+Space / Return / E | launcher / terminal / files |
+| Super+Escape | power menu |
+| Super+Shift+S | region screenshot, opens in satty to mark up |
+| Print | region screenshot to clipboard |
+| Super+Shift+R | start/stop screen recording (~/Videos/Recordings) |
+| Super+Shift+C | color picker, copies the hex code |
+| Super+. | emoji picker |
+| Super+C | clipboard history |
+| Alt+Tab | next window |
+| Super+L | lock |
 
 ## Status
 

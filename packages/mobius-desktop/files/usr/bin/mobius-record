@@ -1,0 +1,17 @@
+#!/bin/bash
+# Toggle screen recording (Super+Shift+R). First press: pick a region (Esc = whole screen),
+# second press: stop. Saved to ~/Videos/Recordings.
+set -u
+if pkill -INT -x wf-recorder; then
+    notify-send -a "Recorder" "Recording saved" "~/Videos/Recordings"
+    exit 0
+fi
+dir="$HOME/Videos/Recordings"; mkdir -p "$dir"
+out="$dir/$(date +%F_%H-%M-%S).mp4"
+geom="$(slurp 2>/dev/null)" || geom=""
+notify-send -a "Recorder" "Recording started" "Super+Shift+R again to stop"
+if [[ -n "$geom" ]]; then
+    exec wf-recorder -g "$geom" -f "$out"
+else
+    exec wf-recorder -f "$out"
+fi

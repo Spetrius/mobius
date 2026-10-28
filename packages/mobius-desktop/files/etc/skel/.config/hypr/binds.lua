@@ -21,8 +21,20 @@ bind(mod .. " + C",      hl.dsp.exec_cmd("cliphist list | fuzzel --dmenu | cliph
 
 -- Screenshots: region to clipboard, full screen to ~/Pictures/Screenshots
 bind("PRINT",            hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"))
-bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd("grim -g \"$(slurp)\" - | wl-copy"))
+-- Super+Shift+S: region screenshot opens in satty to mark up (Enter copies, Ctrl+S saves)
+bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd("mkdir -p ~/Pictures/Screenshots && grim -g \"$(slurp)\" - | satty --filename - --output-filename ~/Pictures/Screenshots/satty-%Y-%m-%d_%H-%M-%S.png --copy-command wl-copy --early-exit"))
 bind("SHIFT + PRINT",    hl.dsp.exec_cmd("mkdir -p ~/Pictures/Screenshots && grim ~/Pictures/Screenshots/$(date +%F_%H-%M-%S).png"))
+
+-- Tools
+bind(mod .. " + SHIFT + R", hl.dsp.exec_cmd("mobius-record"),  { desc = "Start/stop screen recording" })
+bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd("hyprpicker -a"),  { desc = "Color picker (copies hex)" })
+bind(mod .. " + PERIOD",    hl.dsp.exec_cmd("rofimoji --selector fuzzel --typer wtype --clipboarder wl-copy"), { desc = "Emoji picker" })
+
+-- Alt+Tab cycles windows on the current workspace
+bind("ALT + TAB", function()
+    hl.dispatch(hl.dsp.window.cycle_next())
+    hl.dispatch(hl.dsp.window.bring_to_top())
+end, { desc = "Next window" })
 
 -- Focus
 bind(mod .. " + left",  hl.dsp.focus({ direction = "left" }))
