@@ -1,13 +1,15 @@
 # Everyday apps on top of the desktop: phone link, sync, photography, study.
 pkgname=mobius-apps
 pkgver=2026.10.28
-pkgrel=1
-pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, photography and study tools'
+pkgrel=2
+pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, photography and study tools'
 arch=('any')
 license=('MIT')
 depends=(
   # Phone link (files, notifications, clipboard, remote) and folder sync between machines
   kdeconnect syncthing
+  # Home backups (mobius-backup); fuse3 lets you browse them as folders
+  restic fuse3
   # Photography: RAW editing (darktable also does tethered shooting through gphoto2), editing, camera tools
   darktable rawtherapee gimp gphoto2
   # Study: flashcards for the AMT written exams, notes, PDF/handwritten notes
@@ -15,4 +17,6 @@ depends=(
 )
 install=mobius-apps.install
 
-package() { :; }
+package() {
+  cp -a --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+}

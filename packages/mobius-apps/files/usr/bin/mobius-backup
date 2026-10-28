@@ -1,0 +1,110 @@
+#!/bin/bash
+# Nightly backup of your home folder to the DATA1 drive, with history (restic: encrypted,
+# deduplicated, so each night only stores what changed).
+#
+#   mobius-backup init              set up (once per machine): creates the backup, enables nightly runs
+#   mobius-backup now               back up right now
+#   mobius-backup status            last backup, size, next run
+#   mobius-backup list              all backups (snapshots) kept
+#   mobius-backup browse            open every backup as folders under ~/Backups (Ctrl+C to close)
+#   mobius-backup restore PATH      bring PATH back from the latest backup into ~/Restored
+#
+# Kept: every night for a week, every week for a month, every month for a year.
+# Safety: it only ever writes to a mounted filesystem labeled DATA1, never to a plain folder
+# on your system drive. Without DATA1 present it skips quietly and tries again next night.
+set -euo pipefail
+LABEL="${MOBIUS_BACKUP_LABEL:-DATA1}"
+cfg="${XDG_CONFIG_HOME:-$HOME/.config}/mobius"
+export RESTIC_PASSWORD_FILE="$cfg/backup-password"
+excludes="$cfg/backup-exclude"
+host="$(cat /etc/hostname 2>/dev/null || uname -n)"
+[[ $EUID -ne 0 ]] || { echo "Run as your user, not root."; exit 1; }
+
+notify() { command -v notify-send >/dev/null && notify-send -a "Backup" "$@" 2>/dev/null || true; }
+
+target_mount() { # prints the mountpoint of the filesystem labeled DATA1, or nothing
+    if [[ -n "${MOBIUS_BACKUP_TEST_TARGET:-}" ]]; then echo "$MOBIUS_BACKUP_TEST_TARGET"; return 0; fi
+    local mp
+    mp="$(findmnt -rn -o TARGET,LABEL | awk -v l="$LABEL" '$2 == l { print $1; exit }')"
+    if [[ -n "$mp" ]] && mountpoint -q "$mp"; then echo "$mp"; fi
+    return 0
+}
+
+repo_or_skip() { # sets RESTIC_REPOSITORY or exits 0 (quietly when run by the timer)
+    local mp; mp="$(target_mount)"
+    if [[ -z "$mp" ]]; then
+        echo "$LABEL is not mounted here; nothing backed up."
+        [[ -t 1 ]] && exit 1 || exit 0
+    fi
+    export RESTIC_REPOSITORY="$mp/mobius-backup/$host"
+    [[ -f "$RESTIC_PASSWORD_FILE" ]] || { echo "Not set up yet: run mobius-backup init"; exit 1; }
+}
+
+case "${1:-}" in
+init)
+    mp="$(target_mount)"
+    [[ -n "$mp" ]] || { echo "Mount the $LABEL drive first (open it in Thunar), then run this again."; exit 1; }
+    export RESTIC_REPOSITORY="$mp/mobius-backup/$host"
+    mkdir -p "$cfg"
+    if [[ ! -f "$RESTIC_PASSWORD_FILE" ]]; then
+        (umask 077; head -c 32 /dev/urandom | base64 > "$RESTIC_PASSWORD_FILE")
+    fi
+    [[ -f "$excludes" ]] || cat > "$excludes" <<'X'
+# One pattern per line, relative to your home. Edit freely.
+.cache
+.local/share/Trash
+.local/share/Steam
+.steam
+.var/app/*/cache
+.local/share/lutris/runners
+.wine/drive_c/windows
+Games
+Downloads/*.iso
+X
+    if [[ ! -f "$RESTIC_REPOSITORY/config" ]]; then
+        mkdir -p "$RESTIC_REPOSITORY"; restic init
+    fi
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user enable --now mobius-backup.timer \
+        || echo "Could not enable the nightly timer; run: systemctl --user enable --now mobius-backup.timer"
+    echo
+    echo "Backup set up: $RESTIC_REPOSITORY, nightly."
+    echo "IMPORTANT: save this password somewhere safe (password manager, written down)."
+    echo "Without it the backup cannot be opened if this machine is lost:"
+    echo "    $(cat "$RESTIC_PASSWORD_FILE")"
+    echo "First backup now (the first one takes a while): mobius-backup now"
+    ;;
+now|run)
+    repo_or_skip
+    echo "Backing up $HOME to $RESTIC_REPOSITORY"
+    if restic backup "$HOME" --exclude-file "$excludes" --exclude-caches --one-file-system \
+            --tag nightly --host "$host"; then
+        restic forget --host "$host" --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune >/dev/null
+        [[ "$1" == now ]] && notify "Backup finished"
+    else
+        notify -u critical "Backup FAILED" "Run: mobius-backup now   to see why"
+        exit 1
+    fi
+    ;;
+status)
+    repo_or_skip
+    restic snapshots --host "$host" --latest 1 --compact
+    restic stats --mode raw-data 2>/dev/null | grep -E 'Total Size|Snapshots' || true
+    systemctl --user list-timers mobius-backup.timer --no-pager | head -2
+    ;;
+list)
+    repo_or_skip; restic snapshots --host "$host" --compact ;;
+browse)
+    repo_or_skip; mkdir -p "$HOME/Backups"
+    echo "Backups are under ~/Backups/snapshots/<date>. Press Ctrl+C here when done."
+    restic mount "$HOME/Backups" ;;
+restore)
+    p="${2:?usage: mobius-backup restore <path under your home, e.g. Documents/notes.txt>}"
+    repo_or_skip
+    p="$(realpath -m "$HOME/${p#"$HOME"/}")"
+    restic restore latest --host "$host" --include "$p" --target "$HOME/Restored"
+    echo "Restored into ~/Restored$p (your current files were not touched)"
+    ;;
+*)
+    sed -n '2,15s/^# \{0,1\}//p' "$0"; exit 2 ;;
+esac

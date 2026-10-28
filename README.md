@@ -97,6 +97,7 @@ mobius-skel-sync --force
 | `mobius-update` (or `up` in fish) | safe full system update: Arch news first, then update, new config defaults, vulnerability and firmware report |
 | `mobius-monitors home/dad/auto` | monitor profile |
 | `mobius-skel-sync` | bring configs up to the Mobius defaults; files you edited are kept and listed (`--diff F` / `--take F`). `mobius-update` runs it for you |
+| `mobius-backup init` / `now` / `status` / `list` / `browse` / `restore PATH` | nightly encrypted home backup to the DATA1 drive (only ever to a mounted DATA1, never your system drive) |
 | `limine-snapper-list` | list bootable snapshots |
 | `sudo limine-snapper-restore` | roll back after booting a snapshot |
 | `game-performance %command%` | Steam launch option: performance power profile while the game runs |
