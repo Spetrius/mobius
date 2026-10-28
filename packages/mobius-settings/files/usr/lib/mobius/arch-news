@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Show Arch Linux news posted since the last check. Exit 1 if there was news (the caller asks
+whether to go on), 0 if nothing new or the feed could not be read (never blocks an update)."""
+import os, sys, time, urllib.request, xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
+
+state = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "mobius", "news-seen")
+try:
+    last = float(open(state).read().strip())
+except (OSError, ValueError):
+    last = time.time() - 14 * 86400          # first run: the last two weeks
+try:
+    with urllib.request.urlopen("https://archlinux.org/feeds/news/", timeout=10) as r:
+        root = ET.fromstring(r.read())
+except Exception as e:
+    print(f"(could not check Arch news: {e})")
+    sys.exit(0)
+new = []
+for item in root.iter("item"):
+    when = parsedate_to_datetime(item.findtext("pubDate")).timestamp()
+    if when > last:
+        new.append((when, item.findtext("title"), item.findtext("link")))
+os.makedirs(os.path.dirname(state), exist_ok=True)
+open(state, "w").write(str(time.time()))
+if not new:
+    sys.exit(0)
+print("Arch Linux news since your last update (some need a manual step before updating):")
+for when, title, link in sorted(new):
+    print(f"  {time.strftime('%Y-%m-%d', time.localtime(when))}  {title}\n              {link}")
+sys.exit(1)

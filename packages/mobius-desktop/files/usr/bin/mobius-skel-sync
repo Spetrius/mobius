@@ -1,16 +1,76 @@
 #!/bin/bash
-# Copy Mobius default configs into your home WITHOUT overwriting anything you already have.
-# Use --force to back up your current ~/.config/<app> and take the Mobius version.
+# Keep ~/.config in step with the Mobius defaults in /etc/skel/.config.
+#
+#   mobius-skel-sync            update: new files are copied; files you never edited get the new
+#                               Mobius version; files you edited are kept and listed
+#   mobius-skel-sync --diff F   show how your F differs from the Mobius default (F relative to ~/.config)
+#   mobius-skel-sync --take F   replace your F with the Mobius default (yours saved as F~)
+#   mobius-skel-sync --force    take every default (each app folder backed up first)
+#
+# "Never edited" is tracked by remembering the default as last synced, in
+# ~/.local/share/mobius/skel-base. A file is yours once it differs from that copy.
 set -euo pipefail
-force=0; [[ "${1:-}" == "--force" ]] && force=1
-stamp="$(date +%Y%m%d-%H%M%S)"
-cd /etc/skel/.config
-for app in */; do
-    app="${app%/}"; dest="$HOME/.config/$app"
-    if [[ -e "$dest" && $force -eq 1 ]]; then
-        mv "$dest" "$dest.bak-$stamp"; echo "backed up $dest -> $dest.bak-$stamp"
+skel="${MOBIUS_SKEL:-/etc/skel/.config}"   # override only for testing
+conf="$HOME/.config"
+base="${XDG_DATA_HOME:-$HOME/.local/share}/mobius/skel-base"
+[[ $EUID -ne 0 ]] || { echo "Run as your user, not root."; exit 1; }
+
+remember() { install -Dm644 "$skel/$1" "$base/$1"; }
+
+case "${1:-}" in
+--diff)
+    f="${2:?usage: mobius-skel-sync --diff <file under ~/.config>}"
+    diff -u --label "mobius default" --label "yours" "$skel/$f" "$conf/$f" || true
+    exit 0 ;;
+--take)
+    f="${2:?usage: mobius-skel-sync --take <file under ~/.config>}"
+    [[ -f "$skel/$f" ]] || { echo "no Mobius default for $f"; exit 1; }
+    [[ -f "$conf/$f" ]] && cp -f "$conf/$f" "$conf/$f~"
+    install -Dm644 "$skel/$f" "$conf/$f"; remember "$f"
+    echo "took Mobius $f (yours saved as $f~)"; exit 0 ;;
+--force)
+    stamp="$(date +%Y%m%d-%H%M%S)"
+    cd "$skel"
+    for app in */; do
+        app="${app%/}"
+        [[ -e "$conf/$app" ]] && mv "$conf/$app" "$conf/$app.bak-$stamp" && echo "backed up $app -> $app.bak-$stamp"
+    done
+    mkdir -p "$conf"; cp -r "$skel/." "$conf/"
+    find . -type f -printf '%P\n' | while read -r f; do remember "$f"; done
+    echo "all Mobius defaults taken"; exit 0 ;;
+"") ;;
+*)  sed -n '2,12s/^# \{0,1\}//p' "$0"; exit 2 ;;
+esac
+
+changed=() kept=()
+cd "$skel"
+while read -r f; do
+    mine="$conf/$f" was="$base/$f"
+    if [[ ! -e "$mine" ]]; then
+        install -Dm644 "$f" "$mine"; remember "$f"; changed+=("$f (new)")
+    elif cmp -s "$f" "$mine"; then
+        remember "$f"                                   # already identical
+    elif [[ -f "$was" ]] && cmp -s "$was" "$mine"; then
+        install -Dm644 "$f" "$mine"; remember "$f"; changed+=("$f")   # untouched by you: update
+    elif [[ ! -f "$was" ]]; then
+        remember "$f"; kept+=("$f")                     # first sync: yours differs, keep it (listed once)
+    elif ! cmp -s "$was" "$f"; then
+        kept+=("$f")                                    # yours, and the default moved on
     fi
-    mkdir -p "$dest"
-    cp -rn "/etc/skel/.config/$app/." "$dest/"
-    echo "synced $app"
-done
+done < <(find . -type f -printf '%P\n' | sort)
+
+if (( ${#changed[@]} )); then
+    echo "Updated from Mobius defaults:"; printf '  %s\n' "${changed[@]}"
+    # Apply right away when running inside Hyprland
+    if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+        printf '%s\n' "${changed[@]}" | grep -q '^hypr/' && hyprctl reload >/dev/null || true
+        printf '%s\n' "${changed[@]}" | grep -q '^waybar/' && pkill -USR2 -x waybar || true
+        printf '%s\n' "${changed[@]}" | grep -q '^mako/' && makoctl reload || true
+    fi
+fi
+if (( ${#kept[@]} )); then
+    echo "Kept your version (you changed it from the Mobius default):"
+    printf '  %s\n' "${kept[@]}"
+    echo "  See the difference: mobius-skel-sync --diff <file>   Take Mobius's: mobius-skel-sync --take <file>"
+fi
+(( ${#changed[@]} + ${#kept[@]} )) || echo "Config is up to date with the Mobius defaults."
