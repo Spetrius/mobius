@@ -15,6 +15,7 @@ Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and syste
 | Gaming | Steam, GE-Proton (packaged in our repo), Lutris, Wine Staging, umu, protontricks, GameMode, MangoHud, gamescope, RADV only, LACT, amdgpu_top |
 | Claude | Claude Code CLI and Claude Desktop, both repacked from Anthropic's official builds, updated through pacman |
 | VPN | Proton VPN (Arch's `proton-vpn-gtk-app`), starts minimized to the tray at login |
+| Apps | `mobius-apps`: KDE Connect (phone link), Syncthing (folder sync), darktable, RawTherapee, GIMP, gphoto2, Anki, Obsidian, Xournal++ |
 
 ### Things it fixes from the old setup
 - **Boot guard.** pacman refuses to touch kernels if `/boot` isn't mounted, and after every update it checks that each kernel really landed on the EFI partition. That's the Sep 29 failure, blocked automatically.
@@ -96,6 +97,21 @@ mobius-skel-sync --force
 | `limine-snapper-list` | list bootable snapshots |
 | `sudo limine-snapper-restore` | roll back after booting a snapshot |
 | `game-performance %command%` | Steam launch option: performance power profile while the game runs |
+
+## Keys
+
+| Keys | Does |
+|---|---|
+| Super+Space / Return / E | launcher / terminal / files |
+| Super+Escape | power menu |
+| Super+Shift+S | region screenshot, opens in satty to mark up |
+| Print | region screenshot to clipboard |
+| Super+Shift+R | start/stop screen recording (~/Videos/Recordings) |
+| Super+Shift+C | color picker, copies the hex code |
+| Super+. | emoji picker |
+| Super+C | clipboard history |
+| Alt+Tab | next window |
+| Super+L | lock |
 
 ## Status
 
