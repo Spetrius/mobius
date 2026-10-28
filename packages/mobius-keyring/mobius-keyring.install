@@ -1,0 +1,7 @@
+populate() {
+  if usr/bin/pacman-key --list-keys >/dev/null 2>&1; then
+    usr/bin/pacman-key --populate mobius >/dev/null 2>&1 && echo ":: Mobius signing key added to pacman's keyring"
+  fi
+}
+post_install() { populate; }
+post_upgrade() { populate; }
