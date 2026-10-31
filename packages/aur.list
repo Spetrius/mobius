@@ -1,7 +1,12 @@
 # AUR packages rebuilt into the Mobius repo, in build order. Format: name commit
 # Pinned to an AUR git commit so builds are reproducible. Bump with: build/bump-aur.sh
-proton-ge-custom-bin 4ad3fe08e14a4803b0678b2f8ac8836608571b3f
+proton-ge-custom-bin 9c8b336149323d2c71b71d5e6eaa647a6f8a6043
+9c8b336149323d2c71b71d5e6eaa647a6f8a6043
 cachyos-ananicy-rules-git 8223ff76a726fbdc798232b539f8e34efcd7f365
-paru 329be2113c590046cb29858c23d9b96a8d7bd586
+8223ff76a726fbdc798232b539f8e34efcd7f365
+paru 675b2c0803072a523f2ea9f5a9372ec271b74f8d
+675b2c0803072a523f2ea9f5a9372ec271b74f8d
 limine-mkinitcpio-hook 94ffde9c60808595b287edf9d4219da202a85a7a
+94ffde9c60808595b287edf9d4219da202a85a7a
 limine-snapper-sync b3c82aded52032687a76922f2dee9497600818f2
+b3c82aded52032687a76922f2dee9497600818f2
