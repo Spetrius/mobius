@@ -54,7 +54,8 @@ jobs:
               echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
               sed -i "s/^#MAKEFLAGS.*/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf
               chown -R builder: /src
-              sudo --preserve-env=MOBIUS_GH,MOBIUS_SIGNING_KEY -u builder build/build-repo.sh out/repo
+              # KEEP_GOING: one failing package (e.g. a kernel that does not compile) must not hold back the rest
+              sudo --preserve-env=MOBIUS_GH,MOBIUS_SIGNING_KEY -u builder env KEEP_GOING=1 build/build-repo.sh out/repo
               if [ "$BUILD_ISO" = "true" ]; then MOBIUS_GH="$MOBIUS_GH" build/build-iso.sh out/iso; fi
             '
 
