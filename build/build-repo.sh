@@ -47,10 +47,24 @@ install_build_deps() {  # $1 = dir with PKGBUILD
     fi
 }
 
+register_built() {  # $1 = dir with PKGBUILD: built earlier (e.g. cached by a failed run) but not in the database
+    local f entry added=0
+    while read -r f; do
+        [[ -f "$f" ]] || continue
+        entry="$(basename "$f")"; entry="${entry%-*.pkg.tar.zst}"      # name-ver-rel
+        if ! bsdtar -tf "$out/mobius.db.tar.zst" 2>/dev/null | grep -qx "$entry/"; then
+            repo-add -q -R "$out/mobius.db.tar.zst" "$f"; added=1
+            echo "   added to the database: $entry"
+        fi
+    done < <(cd "$1" && PKGDEST="$out" makepkg --packagelist)
+    (( added )) && sudo pacman -Sy --noconfirm >/dev/null
+    return 0
+}
+
 build_dir() {       # $1 = dir with PKGBUILD
     local d="$1" name; name="$(basename "$d")"
     if [[ " ${SKIP_PKGS:-} " == *" $name "* ]]; then echo "== $name: skipped (SKIP_PKGS)"; return; fi
-    if already_built "$d"; then echo "== $name: up to date"; return; fi
+    if already_built "$d"; then echo "== $name: up to date"; register_built "$d"; return; fi
     echo "== $name: building"
     install_build_deps "$d"
     # Signing keys for verified sources (Arch convention: keys/pgp/<fingerprint>.asc)
@@ -125,6 +139,7 @@ if [[ -n "${MOBIUS_SIGNING_KEY:-}" ]]; then
     rm -rf "$GNUPGHOME"
 fi
 
-if (( ${#failed[@]} )); then echo "FAILED: ${failed[*]}"; fi
 echo "Repo ready: $out"
 ls -1 "$out" | grep -c '\.pkg\.tar\.zst$' | xargs echo "packages:"
+# KEEP_GOING: everything else was built and is in the repo, but the run still reports failure
+if (( ${#failed[@]} )); then echo "FAILED: ${failed[*]}"; exit 1; fi
