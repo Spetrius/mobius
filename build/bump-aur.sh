@@ -7,7 +7,7 @@ tmp="$(mktemp)"
 while IFS= read -r line; do
     if [[ -z "$line" || "$line" == \#* ]]; then echo "$line"; continue; fi
     name="${line%% *}"
-    commit="$(git ls-remote "https://aur.archlinux.org/$name.git" HEAD | cut -f1)"
+    commit="$(git ls-remote "https://aur.archlinux.org/$name.git" HEAD | head -1 | cut -f1)"   # newer git can list HEAD twice
     [[ -n "$commit" ]] || { echo "cannot resolve $name" >&2; exit 1; }
     echo "$name $commit"
 done < "$list" > "$tmp"
