@@ -19,6 +19,13 @@ bind(mod .. " + SHIFT + E", hl.dsp.exit(),             { desc = "Log out" })
 bind(mod .. " + Escape", hl.dsp.exec_cmd("mobius-power-menu"), { desc = "Power menu" })
 bind(mod .. " + T",      hl.dsp.exec_cmd("mobius-theme"),       { desc = "Theme and layout picker" })
 bind(mod .. " + ALT + O", hl.dsp.exec_cmd("wayvncctl output-cycle"), { desc = "Remote desktop: show the next monitor" })
+
+-- Remote desktop pass-through (mobius-remote turns it on while the viewer is open): no shortcuts
+-- here, every key goes to the focused window. Super+F12 toggles it by hand.
+hl.define_submap("remote", function()
+    bind(mod .. " + F12", hl.dsp.submap("reset"), { desc = "Shortcuts back to this machine" })
+end)
+bind(mod .. " + F12", hl.dsp.submap("remote"), { desc = "Pass every key to the focused window" })
 bind(mod .. " + C",      hl.dsp.exec_cmd("cliphist list | fuzzel --dmenu | cliphist decode | wl-copy"), { desc = "Clipboard history" })
 
 -- Screenshots: region to clipboard, full screen to ~/Pictures/Screenshots
