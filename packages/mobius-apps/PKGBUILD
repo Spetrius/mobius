@@ -1,8 +1,8 @@
 # Everyday apps on top of the desktop: phone link, sync, photography, study.
 pkgname=mobius-apps
 pkgver=2026.10.28
-pkgrel=2
-pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, photography and study tools'
+pkgrel=3
+pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, OBS, photography and study tools'
 arch=('any')
 license=('MIT')
 depends=(
@@ -14,6 +14,9 @@ depends=(
   darktable rawtherapee gimp gphoto2
   # Study: flashcards for the AMT written exams, notes, PDF/handwritten notes
   anki obsidian xournalpp
+  # Recording and streaming (screen capture through PipeWire + xdg-desktop-portal-hyprland;
+  # hardware encoding: VAAPI on the Radeon, NVENC on the laptop RTX). Not autostarted.
+  obs-studio
 )
 install=mobius-apps.install
 
