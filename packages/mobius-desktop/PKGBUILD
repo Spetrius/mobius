@@ -1,7 +1,7 @@
 # Mobius desktop: Hyprland (Lua config, no UWSM), greetd login, default user config in /etc/skel.
 pkgname=mobius-desktop
 pkgver=2026.10.18
-pkgrel=14
+pkgrel=15
 pkgdesc='Mobius Linux Hyprland desktop and default configs'
 arch=('any')
 license=('MIT')
@@ -17,6 +17,8 @@ depends=(
   satty wf-recorder hyprpicker rofimoji wtype libnotify
   # Theme switcher (mobius-theme): wallpaper generator, color picker dialog, theme fonts
   python-pillow zenity mobius-fonts
+  # Remote desktop over Tailscale (mobius-remote): server and viewer
+  wayvnc tigervnc
   mobius-apps
   qt5-wayland qt6-wayland qt6ct nwg-look
   pipewire pipewire-pulse pipewire-alsa wireplumber

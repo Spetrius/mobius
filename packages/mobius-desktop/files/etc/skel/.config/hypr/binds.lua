@@ -18,6 +18,7 @@ bind(mod .. " + L",      hl.dsp.exec_cmd("hyprlock"),  { desc = "Lock" })
 bind(mod .. " + SHIFT + E", hl.dsp.exit(),             { desc = "Log out" })
 bind(mod .. " + Escape", hl.dsp.exec_cmd("mobius-power-menu"), { desc = "Power menu" })
 bind(mod .. " + T",      hl.dsp.exec_cmd("mobius-theme"),       { desc = "Theme and layout picker" })
+bind(mod .. " + ALT + O", hl.dsp.exec_cmd("wayvncctl output-cycle"), { desc = "Remote desktop: show the next monitor" })
 bind(mod .. " + C",      hl.dsp.exec_cmd("cliphist list | fuzzel --dmenu | cliphist decode | wl-copy"), { desc = "Clipboard history" })
 
 -- Screenshots: region to clipboard, full screen to ~/Pictures/Screenshots
