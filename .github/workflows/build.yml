@@ -39,8 +39,11 @@ jobs:
 
       - name: Build packages and ISO in an Arch container
         id: build
+        env:
+          # Signs packages and the database once the secret exists (Settings > Secrets > Actions)
+          MOBIUS_SIGNING_KEY: ${{ secrets.MOBIUS_SIGNING_KEY }}
         run: |
-          docker run --rm --privileged -v "$PWD:/src" -w /src \
+          docker run --rm --privileged -v "$PWD:/src" -w /src -e MOBIUS_SIGNING_KEY \
             -e MOBIUS_GH="${{ github.repository }}" -e BUILD_ISO="${{ github.event_name == 'schedule' || inputs.iso }}" \
             archlinux:base-devel bash -euxc '
               printf "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n" >> /etc/pacman.conf
@@ -49,7 +52,7 @@ jobs:
               echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
               sed -i "s/^#MAKEFLAGS.*/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf
               chown -R builder: /src
-              sudo -u builder env MOBIUS_GH="$MOBIUS_GH" build/build-repo.sh out/repo
+              sudo --preserve-env=MOBIUS_GH,MOBIUS_SIGNING_KEY -u builder build/build-repo.sh out/repo
               if [ "$BUILD_ISO" = "true" ]; then MOBIUS_GH="$MOBIUS_GH" build/build-iso.sh out/iso; fi
             '
 
@@ -75,9 +78,11 @@ jobs:
           [ -f out/repo/mobius.db.tar.zst ] || { echo "nothing built"; exit 0; }
           cd out/repo
           if [ "${{ steps.test.outcome }}" = success ]; then
-            gh release upload repo --clobber *.pkg.tar.zst mobius.db mobius.db.tar.zst mobius.files mobius.files.tar.zst
+            sigs=(); for f in *.sig; do [ -e "$f" ] && sigs+=("$f"); done
+            gh release upload repo --clobber *.pkg.tar.zst "${sigs[@]}" mobius.db mobius.db.tar.zst mobius.files mobius.files.tar.zst
           else
-            gh release upload repo --clobber *.pkg.tar.zst
+            sigs=(); for f in *.pkg.tar.zst.sig; do [ -e "$f" ] && sigs+=("$f"); done
+            gh release upload repo --clobber *.pkg.tar.zst "${sigs[@]}"
             echo "::error::Tests did not pass: packages cached, repo database NOT published"
             exit 1
           fi

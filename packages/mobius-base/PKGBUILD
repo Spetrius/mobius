@@ -1,14 +1,14 @@
 # The Mobius base system on top of Arch's "base".
 pkgname=mobius-base
 pkgver=2026.10.18
-pkgrel=3
+pkgrel=4
 pkgdesc='Mobius Linux base: kernel, boot, snapshots, tuning, networking, tools, Claude'
 arch=('any')
 license=('MIT')
 depends=(
   base base-devel linux-firmware amd-ucode
   linux-mobius linux-mobius-headers
-  mobius-settings
+  mobius-settings mobius-keyring
   # Boot + snapshots (Limine, btrfs, snapper; snapshot boot entries like CachyOS)
   limine efibootmgr btrfs-progs snapper snap-pac limine-snapper-sync limine-mkinitcpio-hook btrfs-assistant inotify-tools
   # Networking

@@ -40,7 +40,7 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 - **Installed on spetlin (2026-10-20)**: reuse mode over CachyOS worked, desktop and autostart came up. Helldivers 2 crashed mid-mission on Proton Experimental (STATUS_INVALID_HANDLE); GE-Proton being tested.
 - **Hyprland 0.56 `hyprctl dispatch` takes Lua**: hypridle's `dpms off` line was silently broken; fixed to `hl.dsp.dpms({ action = "off" })` (confirmed working on spetlin).
 - **Anything on real hardware**: RX 9060 XT under linux-mobius, monitor auto-detection by EDID name, Waybar GPU module, Steam/Proton games, Claude Desktop sign-in with the keyring.
-- Package signing: the `[mobius]` repo is unsigned (`SigLevel = Optional TrustAll`). Fine while it's only you, worth fixing before anyone else uses it.
+- Package signing: in rollout. `mobius-keyring` ships the public key (5AB5687C08E40D1E577A5C36A18F9AAF07BF3DB6); CI signs once the `MOBIUS_SIGNING_KEY` secret exists; then each machine switches `[mobius]` to `SigLevel = Required`. Verified locally: a signed repo syncs and installs with `Required`, an altered package is refused.
 
 ## End-to-end VM test (2026-10-19)
 QEMU, UEFI (OVMF), 4 vCPU emulated, 30 GB disk. Booted the Mobius ISO and ran `mobius-install` in fresh mode exactly as you would. Then rebooted into the installed disk:

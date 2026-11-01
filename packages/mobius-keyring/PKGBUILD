@@ -1,0 +1,14 @@
+# The public key that signs the [mobius] repo, installed into pacman's keyring
+# (same mechanism as archlinux-keyring: pacman-key --populate mobius).
+pkgname=mobius-keyring
+pkgver=2026.10.28
+pkgrel=1
+pkgdesc='Mobius Linux package signing key'
+arch=('any')
+license=('MIT')
+depends=(pacman)
+install=mobius-keyring.install
+
+package() {
+  cp -a --no-preserve=ownership "$startdir/files/." "$pkgdir/"
+}

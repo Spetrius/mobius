@@ -3,6 +3,7 @@
 #   build/build-repo.sh [outdir]        default outdir: ./out/repo
 #   SKIP_PKGS="linux-mobius" build/build-repo.sh    skip named packages
 #   KEEP_GOING=1 build/build-repo.sh                 report failures instead of stopping
+#   MOBIUS_SIGNING_KEY="$(cat key.asc)" build/...   sign packages and the database (CI secret)
 # Skips anything whose exact version is already in outdir, so reruns are cheap.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -89,6 +90,24 @@ while read -r name commit; do
 done < "$root/packages/aur.list"
 
 for p in "${MOBIUS_LOCAL_PKGS[@]}"; do build_dir "$work/$p"; done
+
+# Signing. With the key: every package without a signature gets one, and the database files are
+# re-signed (they change every run). Without it, nothing is signed (the repo stays unsigned).
+if [[ -n "${MOBIUS_SIGNING_KEY:-}" ]]; then
+    export GNUPGHOME="$work/gnupg"; rm -rf "$GNUPGHOME"; mkdir -m700 "$GNUPGHOME"
+    gpg --batch --quiet --import <<<"$MOBIUS_SIGNING_KEY"
+    fpr="$(gpg --batch --list-secret-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')"
+    sign() { gpg --batch --yes --quiet --pinentry-mode loopback --passphrase '' -u "$fpr" --detach-sign --no-armor "$1"; }
+    n=0
+    for f in "$out"/*.pkg.tar.zst; do [[ -f "$f.sig" ]] || { sign "$f"; n=$((n+1)); }; done
+    for f in mobius.db mobius.db.tar.zst mobius.files mobius.files.tar.zst; do
+        [[ -e "$out/$f" ]] || continue
+        [[ -L "$out/$f" ]] && cp --remove-destination "$(readlink -f "$out/$f")" "$out/$f"   # releases can't hold symlinks
+        sign "$out/$f"
+    done
+    echo "signed $n new package(s) and the database with $fpr"
+    rm -rf "$GNUPGHOME"
+fi
 
 if (( ${#failed[@]} )); then echo "FAILED: ${failed[*]}"; fi
 echo "Repo ready: $out"

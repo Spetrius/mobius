@@ -1,0 +1,64 @@
+#!/bin/bash
+# Secure Boot with your own keys (sbctl), the Limine way.
+#   mobius-secureboot            status
+#   sudo mobius-secureboot setup one-time setup (the firmware must be in Setup Mode, see below)
+#
+# How it protects the boot: the firmware only starts a Limine signed with your key; that Limine
+# carries a checksum of limine.conf (enrolled config), and limine.conf carries BLAKE2 checksums of
+# every kernel and initramfs (ENABLE_VERIFICATION). Change any of them and it refuses to boot.
+# Kernel and package updates keep working: limine-update and sbctl's pacman hook re-sign and
+# re-enroll automatically.
+#
+# Before setup, in the BIOS (menu names vary by BIOS version):
+#   Legion 5i:  Security > Secure Boot > Reset to Setup Mode (or "Clear Secure Boot Keys")
+#   MSI X470:   Settings > Advanced > Windows OS Configuration > Secure Boot > Secure Boot Mode: Custom
+#               > Key Management > Delete All Secure Boot Variables (No reboot yet)
+# Leave Secure Boot itself DISABLED until setup has finished, then turn it on.
+set -euo pipefail
+
+status() {
+    if ! command -v sbctl >/dev/null; then echo "sbctl not installed: Secure Boot not set up."; return; fi
+    sbctl status || true
+    echo; sbctl verify 2>/dev/null | sed 's/^/  /' || true
+}
+
+[[ "${1:-status}" == status ]] && { status; exit 0; }
+[[ "$1" == setup ]] || { sed -n '2,3s/^# //p' "$0"; exit 2; }
+[[ $EUID -eq 0 ]] || exec sudo "$0" setup
+
+pacman -S --needed --noconfirm sbctl
+mountpoint -q /boot || { echo "/boot is not mounted, stopping."; exit 1; }
+
+if [[ "$(sbctl status --json | python3 -c 'import json,sys;print(json.load(sys.stdin).get("setup_mode"))')" != True ]]; then
+    echo "The firmware is not in Setup Mode, so new keys can't be enrolled."
+    sed -n '/^# Before setup/,/^# Leave/s/^# //p' "$0"
+    exit 1
+fi
+
+echo ":: Creating your Secure Boot keys"
+sbctl setup --print-state --json 2>/dev/null | grep -q '"installed": true' || sbctl create-keys
+echo ":: Enrolling them, together with Microsoft's"
+# Microsoft's keys stay: the GPU firmware (NVIDIA/AMD option ROMs) is signed by Microsoft,
+# and without them the screen or the whole machine may not come up with Secure Boot on.
+sbctl enroll-keys --microsoft
+
+echo ":: Signing Limine (and remembering the files so updates re-sign them)"
+found=0
+while read -r f; do sbctl sign -s "$f"; found=1; done < <(find /boot/EFI/limine /boot/EFI/BOOT -maxdepth 1 -iname '*.efi' 2>/dev/null)
+(( found )) || { echo "No Limine EFI binary found under /boot/EFI, stopping before anything else changes."; exit 1; }
+
+echo ":: Protecting limine.conf with an enrolled checksum"
+if grep -q '^ENABLE_ENROLL_LIMINE_CONFIG=' /etc/default/limine; then
+    sed -i 's/^ENABLE_ENROLL_LIMINE_CONFIG=.*/ENABLE_ENROLL_LIMINE_CONFIG=yes/' /etc/default/limine
+else
+    echo 'ENABLE_ENROLL_LIMINE_CONFIG=yes' >> /etc/default/limine
+fi
+grep -q '^ENABLE_VERIFICATION=no' /etc/default/limine && sed -i 's/^ENABLE_VERIFICATION=no/ENABLE_VERIFICATION=yes/' /etc/default/limine
+limine-update
+limine-enroll-config
+
+echo
+sbctl verify
+echo
+echo "Done. Reboot into the BIOS and turn Secure Boot ON. If the machine doesn't boot:"
+echo "turn Secure Boot off again in the BIOS (nothing else changes), boot, and run: mobius-secureboot"

@@ -209,14 +209,42 @@ mount_target() {
 }
 
 # ---------------------------------------------------------------- install
+# Public half of the [mobius] signing key (same as packages/mobius-keyring). Built into the
+# installer so any ISO, old or new, can verify a signed repo.
+MOBIUS_KEY_FPR="5AB5687C08E40D1E577A5C36A18F9AAF07BF3DB6"
+MOBIUS_KEY_ASC='-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+mDMEauI4CxYJKwYBBAHaRw8BAQdAWRfvh09eV42aRrRPAUVoMvAqOmeqGHicyUqd
+1XrHrlS0Rk1vYml1cyBMaW51eCBwYWNrYWdlIHNpZ25pbmcgPG1vYml1cy1zaWdu
+aW5nQHVzZXJzLm5vcmVwbHkuZ2l0aHViLmNvbT6IkAQTFgoAOBYhBFq1aHwI5A0e
+V3pcNqGPmq8Hvz22BQJq4jgLAhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJ
+EKGPmq8Hvz22z8EBAJ/SVLvTGMx95tY6eMWCymiIN5l8rn+ni0C5wTqGmliiAQDt
+Mplgoza625LUTEgZgBY02EzsgQvmqvWyZZ48l80wBw==
+=Ztk+
+-----END PGP PUBLIC KEY BLOCK-----'
+REPO_SIGLEVEL="Optional TrustAll"
+
+trust_mobius_key() {
+    # Into the live system's keyring (pacstrap verifies with it); the installed system gets the
+    # same key from the mobius-keyring package. Signed repo -> Required, else stay Optional.
+    local f=/tmp/mobius-signing-key.asc
+    printf '%s\n' "$MOBIUS_KEY_ASC" > "$f"
+    run pacman-key --add "$f" >/dev/null 2>&1 || true
+    run pacman-key --lsign-key "$MOBIUS_KEY_FPR" >/dev/null 2>&1 || true
+    if curl -fsL -r 0-0 -o /dev/null "$INSTALL_REPO_URL/mobius.db.sig" 2>/dev/null; then
+        REPO_SIGLEVEL="Required"
+        say "Mobius repo is signed: package signatures will be verified"
+    fi
+}
+
 write_pacman_conf() { # $1 = output path, $2 = mobius Server line
     sed '/^\[mobius\]/,/^$/d' /etc/pacman.conf > "$1"
     # Mobius repo goes first so our packages win over same-named ones
-    python3 - "$1" "$2" <<'PY'
+    python3 - "$1" "$2" "$REPO_SIGLEVEL" <<'PY'
 import sys, re
-path, server = sys.argv[1], sys.argv[2]
+path, server, siglevel = sys.argv[1], sys.argv[2], sys.argv[3]
 s = open(path).read()
-block = "[mobius]\nSigLevel = Optional TrustAll\n" + server + "\n\n"
+block = "[mobius]\nSigLevel = " + siglevel + "\n" + server + "\n\n"
 s = s.replace("[core]", block + "[core]", 1)
 if not re.search(r"^\[multilib\]", s, re.M):
     s += "\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n"
@@ -254,9 +282,10 @@ pacstrap_visible() { # $1 = pacman.conf, rest = packages
 install_packages() {
     say "Installing packages (Mobius repo on GitHub + Arch mirrors, a few GB)"
     local conf=/tmp/pacman-install.conf
-    write_pacman_conf "$conf" "Server = $INSTALL_REPO_URL"
     run pacman-key --init >/dev/null 2>&1 || true
     run pacman-key --populate archlinux >/dev/null 2>&1 || true
+    trust_mobius_key
+    write_pacman_conf "$conf" "Server = $INSTALL_REPO_URL"
     run pacman -Sy --config "$conf"
     local pkgs=(mobius-base mobius-desktop mobius-gaming "${EXTRA_PKGS[@]}" "${HW_PKGS[@]}")
     [[ -n "${MOBIUS_PKGS:-}" ]] && read -r -a pkgs <<< "$MOBIUS_PKGS"

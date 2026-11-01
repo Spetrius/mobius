@@ -13,7 +13,17 @@ step() { echo; echo "== $*"; }
 bad()  { echo "FAIL: $*"; fail=1; }
 
 grep -q '^\[multilib\]' /etc/pacman.conf || printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
-grep -q '^\[mobius\]' /etc/pacman.conf || printf '\n[mobius]\nSigLevel = Optional TrustAll\nServer = %s\n' "$server" >> /etc/pacman.conf
+# Signed repo: trust the Mobius key and require valid signatures, exactly like the installed systems
+siglevel="Optional TrustAll"
+if [[ -e "${server#file://}/mobius.db.sig" ]] || curl -fsL -r 0-0 -o /dev/null "$server/mobius.db.sig" 2>/dev/null; then
+    key="$(dirname "$0")/../packages/mobius-keyring/mobius-signing-key.asc"
+    pacman-key --init >/dev/null 2>&1; pacman-key --populate archlinux >/dev/null 2>&1
+    pacman-key --add "$key" >/dev/null
+    pacman-key --lsign-key "$(gpg --show-keys --with-colons "$key" | awk -F: '/^fpr/{print $10; exit}')" >/dev/null
+    siglevel="Required"
+fi
+echo "repo signature level: $siglevel"
+grep -q '^\[mobius\]' /etc/pacman.conf || printf '\n[mobius]\nSigLevel = %s\nServer = %s\n' "$siglevel" "$server" >> /etc/pacman.conf
 pacman -Syu --noconfirm >/dev/null      # fresh container: bring it current first
 
 step "dependency resolution"
