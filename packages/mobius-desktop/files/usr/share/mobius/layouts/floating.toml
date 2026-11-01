@@ -1,0 +1,13 @@
+name = "Floating"
+description = "Big gaps, very round corners, floating pill bar"
+gaps_in = 8
+gaps_out = 16
+border_size = 2
+rounding = 14
+blur = true
+shadow = true
+animation = "slide"
+bar_position = "top"
+bar_height = 34
+bar_margin = "8 16 0 16"
+bar_style = "pill"

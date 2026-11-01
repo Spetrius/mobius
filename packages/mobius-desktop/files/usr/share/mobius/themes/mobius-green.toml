@@ -1,0 +1,20 @@
+name = "Mobius Green"
+description = "Deep green with amber bar text (the original Mobius look)"
+wallpaper = "ring"
+font_ui = "JetBrainsMono Nerd Font"
+font_mono = "JetBrainsMono Nerd Font"
+suggested_layout = "default"
+
+[colors]
+bg        = "#031000"   # deepest background: terminal, GTK windows
+surface   = "#062000"   # bars, panels, popups
+overlay   = "#0b3300"   # hover
+accent    = "#136000"   # selection fill
+bright    = "#3a9922"   # borders and highlights
+border2   = "#136000"   # second stop of the active-window border
+text      = "#e3f2dc"
+dim       = "#7a9970"
+bar_text  = "#e0b050"   # Waybar text
+highlight = "#e0b050"   # active workspace, clock, lock screen
+warn      = "#e05555"
+crit      = "#ff3b3b"

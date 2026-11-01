@@ -1,10 +1,3 @@
-* { font-family: "JetBrainsMono Nerd Font"; font-size: 13px; }
-window#waybar { background: rgba(6, 32, 0, 0.90); color: #e0b050; }
-#workspaces button { padding: 0 8px; color: #7a9970; }
-#workspaces button.active { color: #e0b050; border-bottom: 2px solid #e0b050; }
-#clock, #cpu, #memory, #custom-gpu, #backlight, #battery, #pulseaudio, #network, #tray, #custom-power { padding: 0 10px; }
-/* Red only when something needs attention */
-#cpu.warning, #memory.warning, #custom-gpu.warning, #battery.warning:not(.charging),
-#pulseaudio.muted, #network.disconnected { color: #e05555; }
-#cpu.critical, #memory.critical, #custom-gpu.critical, #battery.critical:not(.charging) { color: #ff3b3b; font-weight: bold; }
-#custom-power:hover { color: #e05555; }
+/* Colors, fonts and bar shape come from the current theme/layout: mobius-theme (Super+T).
+   Add your own rules below the import; they win. */
+@import "../mobius/generated/waybar.css";

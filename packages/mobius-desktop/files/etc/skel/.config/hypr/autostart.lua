@@ -5,8 +5,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_TYPE HYPRLAND_INSTANCE_SIGNATURE DISPLAY")
     hl.exec_cmd("systemctl --user start hyprpolkitagent")
 
-    hl.exec_cmd("waybar")
-    hl.exec_cmd("mako")
+    -- Theme files first (first login after an update), then the bar and notifications that use them
+    hl.exec_cmd("sh -c 'mobius-theme ensure --reload; mako & exec waybar'")
     hl.exec_cmd("mobius-wallpaper")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("udiskie --tray")

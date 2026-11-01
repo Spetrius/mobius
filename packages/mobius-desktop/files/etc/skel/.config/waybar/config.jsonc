@@ -1,6 +1,8 @@
 {
   "layer": "top",
-  "height": 30,
+  // Position, height and margins come from the layout (mobius-theme, Super+T)
+  "include": ["~/.config/mobius/generated/waybar-layout.jsonc"],
+  "reload_style_on_change": true,
   "modules-left": ["hyprland/workspaces", "hyprland/window"],
   "modules-center": ["clock"],
   "modules-right": ["custom/gpu", "cpu", "memory", "backlight", "battery", "pulseaudio", "network", "tray", "custom/power"],

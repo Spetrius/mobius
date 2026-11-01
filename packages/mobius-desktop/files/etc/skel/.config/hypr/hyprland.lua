@@ -10,6 +10,10 @@ require("binds")
 require("rules")
 require("autostart")
 
+-- Colors, gaps, corners and borders from the current theme/layout (mobius-theme, Super+T)
+package.path = os.getenv("HOME") .. "/.config/mobius/generated/?.lua;" .. package.path
+pcall(require, "hypr-theme")
+
 local ok, err = pcall(require, "local")
 if not ok and not tostring(err):find("module 'local' not found", 1, true) then
     hl.notification.create({ text = "local.lua: " .. tostring(err), timeout = 8000 })
