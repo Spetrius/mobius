@@ -6,7 +6,8 @@
 #
 # You log in with your normal username and password. Keyboard and mouse work, so you can wake
 # the screens and type your password into the lock screen. One monitor is shown at a time:
-# press Super+Alt+O in the remote window to switch to the next one.
+# press Super+Alt+O in the remote window to switch to the next one. While the viewer is open every
+# key goes to the remote machine; Super+F12 toggles that off and on.
 # Only reachable on the Tailscale address, never on your home network or the internet.
 set -euo pipefail
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -45,7 +46,8 @@ serve() {   # run from Hyprland autostart; does nothing unless 'host on' was cho
         out="$(hyprctl monitors -j 2>/dev/null | python3 -c 'import json,sys
 m=[x["name"] for x in json.load(sys.stdin)]
 print("DP-2" if "DP-2" in m else (m[0] if m else ""))' 2>/dev/null || true)"
-        wayvnc -C "$vnc/config" ${out:+-o "$out"} "$ip" "$PORT" || true
+        # -r: draw the mouse pointer into the picture (viewers don't get it otherwise)
+        wayvnc -r -C "$vnc/config" ${out:+-o "$out"} "$ip" "$PORT" || true
         [[ -f "$flag" ]] || exit 0                                  # turned off: stop
         sleep 5                                                     # crashed or IP changed: restart
     done
@@ -79,7 +81,12 @@ case "${1:-connect}" in
         [[ "${1:-}" == connect ]] && shift || true
         target="${1:-spetlin}"
         command -v vncviewer >/dev/null || { echo "vncviewer (tigervnc) is not installed"; exit 1; }
-        echo "Connecting to $target over Tailscale. Log in with your username and password."
-        echo "In the remote window: Super+Alt+O switches monitor, F8 opens the viewer menu."
-        exec vncviewer -RemoteResize=0 "$target::$PORT" ;;
+        echo "Connecting to $target over Tailscale. Log in with $target's username and password."
+        echo "While connected, every key goes to $target (Super+number, Super+Alt+O to switch monitor...)."
+        echo "Super+F12 gives this machine its shortcuts back (and again to return); F8 is the viewer menu."
+        # Pass-through: this machine's Hyprland stops catching shortcuts until the viewer closes
+        [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && hyprctl dispatch 'hl.dsp.submap("remote")' >/dev/null 2>&1 || true
+        rc=0; vncviewer -RemoteResize=0 "$target::$PORT" || rc=$?
+        [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && hyprctl dispatch 'hl.dsp.submap("reset")' >/dev/null 2>&1 || true
+        exit $rc ;;
 esac
