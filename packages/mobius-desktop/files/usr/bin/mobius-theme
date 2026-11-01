@@ -491,7 +491,8 @@ def fuzzel(options, prompt):
                            input="\n".join(options), capture_output=True, text=True)
     except FileNotFoundError:
         sys.exit("fuzzel is not installed")
-    return p.stdout.strip() if p.returncode == 0 else None
+    # Only the trailing newline: the entries start with a marker or padding ("● " / "  ") that must survive
+    return p.stdout.rstrip("\n") if p.returncode == 0 else None
 
 
 def pick_color():
