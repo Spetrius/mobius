@@ -39,6 +39,8 @@ done
 step "package contents"
 work="$(mktemp -d)"
 mkdir -p "$work/cache"
+# pacman 7 downloads as the unprivileged 'alpm' user (DownloadUser), so the cache must be writable by it
+chmod 755 "$work"; chown alpm: "$work/cache" 2>/dev/null || chmod 777 "$work/cache"
 mapfile -t ours < <(pacman -Slq mobius | grep -E '^mobius-' | sort -u)
 pacman -Swdd --noconfirm --cachedir "$work/cache" "${ours[@]}" >/dev/null
 for p in "${ours[@]}"; do
