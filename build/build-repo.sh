@@ -78,6 +78,22 @@ for p in "${MOBIUS_LOCAL_PKGS[@]}"; do
     { grep -rl "@MOBIUS_GH@" "$work/$p" || true; } | xargs -r sed -i "s|@MOBIUS_GH@|$MOBIUS_GH|g"
 done
 
+# Every Mobius default config that ever shipped, by hash: mobius-skel-sync uses this to tell an old
+# default (safe to update) from a file the user edited. Needs git history (CI: fetch-depth 0).
+skel_history() {
+    local dest="$work/mobius-desktop/files/usr/share/mobius/skel-history.txt" c f rel
+    git -C "$root" rev-parse --is-shallow-repository 2>/dev/null | grep -q false || { echo "(no git history: skel-history skipped)"; return 0; }
+    mkdir -p "$(dirname "$dest")"; : > "$dest"
+    for c in $(git -C "$root" log --format=%H -- packages/mobius-desktop/files/etc/skel/.config); do
+        while read -r f; do
+            rel="${f#packages/mobius-desktop/files/etc/skel/.config/}"
+            echo "$(git -C "$root" show "$c:$f" | sha256sum | cut -d' ' -f1)  $rel"
+        done < <(git -C "$root" ls-tree -r --name-only "$c" -- packages/mobius-desktop/files/etc/skel/.config)
+    done | sort -u > "$dest"
+    echo "skel-history: $(wc -l < "$dest") known default versions"
+}
+[[ -d "$work/mobius-desktop" ]] && skel_history
+
 # AUR packages first (mobius-settings and mobius-base depend on some of them)
 while read -r name commit; do
     [[ -z "$name" || "$name" == \#* ]] && continue

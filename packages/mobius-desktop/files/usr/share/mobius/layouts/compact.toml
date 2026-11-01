@@ -1,0 +1,13 @@
+name = "Compact"
+description = "No gaps, no rounding, thin bar at the bottom: every pixel for windows"
+gaps_in = 0
+gaps_out = 0
+border_size = 1
+rounding = 0
+blur = false
+shadow = false
+animation = "fade"
+bar_position = "bottom"
+bar_height = 24
+bar_margin = ""
+bar_style = "flat"

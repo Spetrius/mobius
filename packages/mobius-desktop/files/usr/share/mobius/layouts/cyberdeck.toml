@@ -1,0 +1,14 @@
+name = "Cyberdeck"
+description = "Square corners, thin glowing borders, HUD-style bar with bracketed workspaces"
+gaps_in = 3
+gaps_out = 8
+border_size = 2
+rounding = 0
+blur = true
+shadow = true
+glow = true
+animation = "slide"
+bar_position = "top"
+bar_height = 34
+bar_margin = ""
+bar_style = "deck"

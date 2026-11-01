@@ -1,0 +1,13 @@
+name = "Default"
+description = "Rounded corners, small gaps, bar on top"
+gaps_in = 4
+gaps_out = 8
+border_size = 2
+rounding = 8
+blur = true
+shadow = true
+animation = "slide"
+bar_position = "top"
+bar_height = 30
+bar_margin = ""
+bar_style = "flat"

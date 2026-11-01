@@ -107,12 +107,28 @@ mobius-skel-sync --force
 | `sudo limine-snapper-restore` | roll back after booting a snapshot |
 | `game-performance %command%` | Steam launch option: performance power profile while the game runs |
 
+## Themes and layouts
+
+Press **Super+T** (or run `mobius-theme`) to switch, live, no update needed:
+
+| Themes | | Layouts | |
+|---|---|---|---|
+| Mobius Green | deep green, amber bar text | Default | rounded, small gaps, bar on top |
+| Cyberdeck | red-on-black HUD, cyan/yellow accents, Rajdhani | Cyberdeck | square, glowing borders, bracketed workspaces |
+| Arctic | navy and ice blue | Floating | big gaps, round corners, floating pill bar |
+| Ember | charcoal and orange | Compact | no gaps, thin bar at the bottom |
+
+Any theme works with any layout. **Custom color...** in the picker opens a color dialog and builds a whole theme (wallpaper included) around the color you pick. Make your own by copying a file from `/usr/share/mobius/themes` (or `layouts`) to `~/.local/share/mobius/themes` and editing it.
+
+Under the hood each app loads one generated file from `~/.config/mobius/generated` (Hyprland, Waybar, mako, fuzzel, Alacritty, hyprlock, GTK); `mobius-theme` rewrites those and reloads the apps. Wallpapers are drawn from the theme's colors at your screen size. A picture in `~/Pictures/Wallpapers/current.*` still wins over the theme wallpaper.
+
 ## Keys
 
 | Keys | Does |
 |---|---|
 | Super+Space / Return / E | launcher / terminal / files |
 | Super+Escape | power menu |
+| Super+T | theme and layout picker |
 | Super+Shift+S | region screenshot, opens in satty to mark up |
 | Print | region screenshot to clipboard |
 | Super+Shift+R | start/stop screen recording (~/Videos/Recordings) |

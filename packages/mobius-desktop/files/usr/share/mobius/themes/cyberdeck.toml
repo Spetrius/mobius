@@ -1,0 +1,20 @@
+name = "Cyberdeck"
+description = "Red-on-black HUD with cyan and yellow accents, angular, Rajdhani type"
+wallpaper = "deck"
+font_ui = "Rajdhani"
+font_mono = "JetBrainsMono Nerd Font"
+suggested_layout = "cyberdeck"
+
+[colors]
+bg        = "#0b0a10"
+surface   = "#150c11"
+overlay   = "#2a1016"
+accent    = "#4a1519"
+bright    = "#ff5c57"   # coral red: borders, headings, body text in menus
+border2   = "#5ef1ff"   # cyan
+text      = "#ff7a70"
+dim       = "#8a3d3a"
+bar_text  = "#ff6a61"
+highlight = "#5ef1ff"   # cyan: active tab/workspace, levels
+warn      = "#f3e600"   # quest yellow
+crit      = "#ff2a2a"

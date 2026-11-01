@@ -16,6 +16,11 @@ base="${XDG_DATA_HOME:-$HOME/.local/share}/mobius/skel-base"
 [[ $EUID -ne 0 ]] || { echo "Run as your user, not root."; exit 1; }
 
 remember() { install -Dm644 "$skel/$1" "$base/$1"; }
+history="${MOBIUS_SKEL_HISTORY:-/usr/share/mobius/skel-history.txt}"
+is_old_default() { # $1 = path under .config, $2 = your file: is it byte-identical to any past Mobius default?
+    [[ -f "$history" ]] || return 1
+    grep -qxF "$(sha256sum < "$2" | cut -d' ' -f1)  $1" "$history"
+}
 
 case "${1:-}" in
 --diff)
@@ -52,12 +57,17 @@ while read -r f; do
         remember "$f"                                   # already identical
     elif [[ -f "$was" ]] && cmp -s "$was" "$mine"; then
         install -Dm644 "$f" "$mine"; remember "$f"; changed+=("$f")   # untouched by you: update
+    elif is_old_default "$f" "$mine"; then
+        install -Dm644 "$f" "$mine"; remember "$f"; changed+=("$f")   # an earlier Mobius default: update
     elif [[ ! -f "$was" ]]; then
         remember "$f"; kept+=("$f")                     # first sync: yours differs, keep it (listed once)
     elif ! cmp -s "$was" "$f"; then
         kept+=("$f")                                    # yours, and the default moved on
     fi
 done < <(find . -type f -printf '%P\n' | sort)
+
+# Configs load generated theme files; make sure they exist before anything reloads
+command -v mobius-theme >/dev/null && mobius-theme ensure || true
 
 if (( ${#changed[@]} )); then
     echo "Updated from Mobius defaults:"; printf '  %s\n' "${changed[@]}"
