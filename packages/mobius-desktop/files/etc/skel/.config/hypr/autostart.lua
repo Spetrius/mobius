@@ -17,6 +17,7 @@ hl.on("hyprland.start", function()
     -- looks for it once. Auto-connect is set in the app: Settings, "Connect at app startup".
     hl.exec_cmd("sh -c 'sleep 3 && protonvpn-app --start-minimized'")
     hl.exec_cmd("wl-paste --watch cliphist store")
+    hl.exec_cmd("mobius-remote serve")           -- remote desktop, only if turned on (mobius-remote host on)
 
     hl.exec_cmd("discord")
     hl.exec_cmd("sh -c 'sleep 5 && steam -silent'")
