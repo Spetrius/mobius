@@ -12,7 +12,8 @@
   "cpu": { "format": "\uf4bc {usage}%", "interval": 3, "states": { "warning": 85, "critical": 95 } },
   "memory": { "format": "\uefc5 {percentage}%", "interval": 5, "states": { "warning": 80, "critical": 92 } },
   "custom/gpu": {
-    "exec": "mobius-gpu-status", "return-type": "json",
+    // hide-empty-text: no icon at all on machines without an AMD GPU (the laptop)
+    "exec": "mobius-gpu-status", "return-type": "json", "hide-empty-text": true,
     "format": "󰢮 {}", "interval": 3
   },
   // Laptop only: both modules disable themselves on a desktop with no battery or backlight
