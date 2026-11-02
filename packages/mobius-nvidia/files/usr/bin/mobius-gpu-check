@@ -7,7 +7,7 @@ fails=0
 
 echo "Driver"
 if [[ -r /proc/driver/nvidia/version ]]; then
-    ok "NVIDIA driver loaded: $(sed -n 's/.*Kernel Module *\([0-9.]*\).*/\1/p' /proc/driver/nvidia/version | head -1)"
+    ok "NVIDIA driver loaded: $(grep -o '[0-9]\{3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' /proc/driver/nvidia/version | head -1)"
 else
     bad "NVIDIA driver not loaded (sudo dkms status, then reboot after mobius-update)"
 fi
@@ -27,13 +27,14 @@ for d in /sys/bus/pci/devices/*; do
         0x8086) ok "Intel GPU present ($(basename "$d"))" ;;
         0x10de) st="$(<"$d/power/runtime_status")"; ctl="$(<"$d/power/control")"
                 [[ "$ctl" == auto ]] && ok "NVIDIA power management on (now: $st)" \
-                                     || bad "NVIDIA power control is '$ctl', it never sleeps (battery drain)"
+                                     || bad "NVIDIA power control is '$ctl', it never sleeps (battery drain). Fixed by mobius-update + reboot"
                 [[ "$st" == suspended ]] && ok "NVIDIA GPU asleep while idle" \
                                          || note "NVIDIA GPU awake ($st); fine if a game or nvidia-smi is running" ;;
     esac
 done
 for c in /sys/class/drm/card*-eDP-*; do
-    [[ -e "$c" ]] || continue
+    # Hybrid laptops have an eDP connector on each GPU; only the connected one drives the panel
+    [[ -e "$c" && "$(cat "$c/status" 2>/dev/null)" == connected ]] || continue
     v="$(<"$(dirname "$c")/$(basename "$c" | cut -d- -f1)/device/vendor")"
     [[ "$v" == 0x8086 ]] && ok "built-in screen driven by the Intel GPU (Hybrid mode)" \
                          || note "built-in screen driven by $v (dGPU mode: fine, but more battery use)"
