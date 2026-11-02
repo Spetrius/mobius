@@ -1,0 +1,23 @@
+{
+  "manifest_version": 2,
+  "name": "Claude Sidebar",
+  "version": "1.0",
+  "description": "Chat with Claude in the Firefox sidebar, about the page you're on or text you select. Uses your own Claude API key.",
+  "browser_specific_settings": {
+    "gecko": { "id": "claude-sidebar@mobius.local", "strict_min_version": "128.0" }
+  },
+  "permissions": ["storage", "tabs", "menus", "<all_urls>", "https://api.anthropic.com/*"],
+  "background": { "scripts": ["background.js"] },
+  "sidebar_action": {
+    "default_title": "Claude",
+    "default_panel": "sidebar.html",
+    "default_icon": "icon.svg",
+    "open_at_install": false
+  },
+  "commands": {
+    "_execute_sidebar_action": {
+      "suggested_key": { "default": "Alt+Shift+C" },
+      "description": "Open or close the Claude sidebar"
+    }
+  }
+}

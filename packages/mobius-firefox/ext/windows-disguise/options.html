@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body { font: menu; padding: 8px; }
+  li { margin: 4px 0; }
+  button { margin-left: 8px; }
+  input { width: 18em; }
+  .hint { color: GrayText; }
+</style>
+</head>
+<body>
+  <p>These sites are told this browser runs on Windows. Subdomains count too.</p>
+  <ul id="list"></ul>
+  <p class="hint" id="empty">No sites yet. Open a site and click the Windows button in the toolbar, or add one here.</p>
+  <form id="add"><input id="site" placeholder="portal.example.edu"> <button>Add</button></form>
+  <script src="options.js"></script>
+</body>
+</html>
