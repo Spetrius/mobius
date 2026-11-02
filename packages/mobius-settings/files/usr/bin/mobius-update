@@ -29,13 +29,23 @@ if command -v mobius-skel-sync >/dev/null; then
     mobius-skel-sync || true
 fi
 
-# Security: installed packages with known vulnerabilities. After a full update anything listed
-# is waiting on a fix from Arch, nothing to do but know about it.
+# Security. Listed in full: advisories a newer package already fixes (normally nothing after a
+# full update) and anything Critical. The rest wait on Arch, often stale tracker entries: one line.
 if command -v arch-audit >/dev/null; then
-    vuln="$(arch-audit -f '%n (%s, %c)' 2>/dev/null || true)"
-    if [[ -n "$vuln" ]]; then
-        echo ":: Known vulnerabilities still unfixed upstream ($(wc -l <<<"$vuln") packages):"
-        sed 's/^/   /' <<<"$vuln" | head -15
+    all="$(arch-audit -f '%n|%s|%c' 2>/dev/null || true)"
+    fixable="$(arch-audit -u -f '%n (%s, fixed in %v)' 2>/dev/null || true)"
+    critical="$(awk -F'|' '$2 == "Critical" { print $1 " (" $3 ")" }' <<<"$all")"
+    if [[ -n "$fixable" ]]; then
+        echo ":: Vulnerable packages with a fix available (update again, or check mirrors):"
+        sed 's/^/   /' <<<"$fixable"
+    fi
+    if [[ -n "$critical" ]]; then
+        echo ":: CRITICAL advisories without a fix yet:"
+        sed 's/^/   /' <<<"$critical"
+    fi
+    n="$(grep -c . <<<"$all" || true)"
+    if (( n > 0 )); then
+        echo ":: $n packages have open advisories in Arch's tracker$([[ -z "$fixable" ]] && echo ", none fixable yet") (details: arch-audit)"
     fi
 fi
 
