@@ -1,20 +1,51 @@
 #!/bin/bash
-# Waybar GPU module: busy % and junction temperature as JSON. Class "warning"/"critical"
-# when the GPU runs hot (busy at 100% is normal while gaming, so load alone never warns).
-dev=""
-for d in /sys/class/drm/card*/device; do [[ -r "$d/gpu_busy_percent" ]] && { dev="$d"; break; }; done
-# No AMD GPU (Intel/NVIDIA laptop): empty text hides the module
-[[ -n "$dev" ]] || { echo '{"text":""}'; exit 0; }
-busy="$(<"$dev/gpu_busy_percent")"
-temp=""
-for l in "$dev"/hwmon/hwmon*/temp*_label; do
-    [[ -r "$l" && "$(<"$l")" == junction ]] && temp=$(( $(<"${l%_label}_input") / 1000 ))
+# Waybar GPU module, as JSON. Class "warning"/"critical" when the GPU runs hot (busy at 100% is
+# normal while gaming, so load alone never warns).
+#   AMD (desktop Radeon): busy % and junction temperature, read from sysfs.
+#   NVIDIA (laptop RTX, hybrid): "off" while it sleeps; usage and temperature only while a program
+#   is using it. Asking nvidia-smi wakes the card, so it is never asked while the card is idle.
+#   Neither: empty text, and Waybar hides the module (hide-empty-text).
+SYS="${MOBIUS_SYSFS:-/sys}"     # overridable for tests
+PROC="${MOBIUS_PROC:-/proc}"
+
+json() { printf '{"text":"%s","class":"%s","tooltip":"%s"}\n' "$1" "$2" "$3"; }
+heat() { # $1 = temp, $2 = warn, $3 = crit -> class
+    if (( $1 >= $3 )); then echo critical; elif (( $1 >= $2 )); then echo warning; fi
+}
+
+# ---- AMD
+for d in "$SYS"/class/drm/card*/device; do
+    [[ -r "$d/gpu_busy_percent" ]] || continue
+    busy="$(<"$d/gpu_busy_percent")" temp=""
+    for l in "$d"/hwmon/hwmon*/temp*_label; do
+        [[ -r "$l" && "$(<"$l")" == junction ]] && temp=$(( $(<"${l%_label}_input") / 1000 ))
+    done
+    if [[ -n "$temp" ]]; then
+        json "$busy% ${temp}°C" "$(heat "$temp" 90 100)" "GPU busy $busy%, junction ${temp}°C"
+    else
+        json "$busy%" "" "GPU busy $busy%"
+    fi
+    exit 0
 done
-class=""
-if [[ -n "$temp" ]]; then
-    (( temp >= 100 )) && class=critical || { (( temp >= 90 )) && class=warning; }
-    text="$busy% ${temp}°C"
-else
-    text="$busy%"
-fi
-printf '{"text":"%s","class":"%s","tooltip":"GPU busy %s%%, junction %s°C"}\n' "$text" "$class" "$busy" "${temp:-?}"
+
+# ---- NVIDIA
+for d in "$SYS"/bus/pci/devices/*; do
+    [[ "$(<"$d/vendor")" == 0x10de && "$(<"$d/class")" == 0x03* ]] 2>/dev/null || continue
+    if [[ "$(cat "$d/power/runtime_status" 2>/dev/null)" == suspended ]]; then
+        json "off" "" "RTX asleep (saving power)"; exit 0
+    fi
+    # In use = one of your programs has an NVIDIA device open (a game, OBS, prime-run...)
+    users=0
+    for fd in "$PROC"/[0-9]*/fd/*; do
+        [[ "$(readlink "$fd" 2>/dev/null)" == /dev/nvidia[0-9]* ]] && { users=1; break; }
+    done
+    if (( users )) && command -v nvidia-smi >/dev/null; then
+        IFS=', ' read -r util temp < <(nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader,nounits 2>/dev/null)
+        if [[ "$util" =~ ^[0-9]+$ && "$temp" =~ ^[0-9]+$ ]]; then
+            json "$util% ${temp}°C" "$(heat "$temp" 85 92)" "RTX busy $util%, ${temp}°C"; exit 0
+        fi
+    fi
+    json "idle" "" "RTX awake, nothing using it (it powers down shortly)"; exit 0
+done
+
+json "" "" ""
