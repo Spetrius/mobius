@@ -15,7 +15,7 @@ Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and syste
 | Gaming | Steam, GE-Proton (packaged in our repo), Lutris, Wine Staging, umu, protontricks, GameMode, MangoHud, gamescope, RADV only, LACT, amdgpu_top |
 | Claude | Claude Code CLI and Claude Desktop, both repacked from Anthropic's official builds, updated through pacman |
 | VPN | Proton VPN (Arch's `proton-vpn-gtk-app`), starts minimized to the tray at login |
-| Firefox | `mobius-firefox`: Claude in the sidebar (Alt+Shift+C, your own API key), and a toolbar button that makes one site believe you run Windows (the school portal) |
+| Firefox | `mobius-firefox`: a toolbar button that makes one site believe you run Windows (the school portal) |
 | Apps | `mobius-apps`: KDE Connect (phone link), Syncthing (folder sync), OBS Studio, darktable, RawTherapee, GIMP, gphoto2, Anki, Obsidian, Xournal++ |
 
 ### Things it fixes from the old setup
@@ -124,12 +124,11 @@ Any theme works with any layout. **Custom color...** in the picker opens a color
 
 Under the hood each app loads one generated file from `~/.config/mobius/generated` (Hyprland, Waybar, mako, fuzzel, Alacritty, hyprlock, GTK); `mobius-theme` rewrites those and reloads the apps. Wallpapers are drawn from the theme's colors at your screen size. A picture in `~/Pictures/Wallpapers/current.*` still wins over the theme wallpaper.
 
-## Firefox extensions
+## Firefox extension
 
-Both come preinstalled for every Firefox profile (`mobius-firefox`, in `/usr/lib/firefox/browser/extensions`). Arch's Firefox allows unsigned extensions there, so no Mozilla account is needed.
+It comes preinstalled for every Firefox profile (`mobius-firefox`, in `/usr/lib/firefox/browser/extensions`). Arch's Firefox allows unsigned extensions there, so no Mozilla account is needed.
 
-- **Claude Sidebar**: Alt+Shift+C, or View > Sidebar > Claude. First time: click **Key** and paste an API key from console.anthropic.com (API use is billed separately from a Claude subscription; the key stays in your Firefox profile). **Page** attaches the page you're on; right-click a selection or a page for **Ask Claude about...**. Uses Claude Opus 5.5; if a safety filter declines a question, the API retries it on its recommended fallback model and the answer says which model replied.
-- **Windows Disguise**: on a site that refuses Linux, click the Windows button in the toolbar. That site (and its subdomains) now sees Windows, the page reloads, and the button shows **WIN**. Click again to turn it off. The list is also under about:addons > Mobius Windows Disguise > Preferences.
+**Windows Disguise**: on a site that refuses Linux, click the Windows button in the toolbar. That site (and its subdomains) now sees Windows, the page reloads, and the button shows **WIN**. Click again to turn it off. The list is also under about:addons > Mobius Windows Disguise > Preferences.
 
 ## Keys
 
@@ -146,7 +145,6 @@ Both come preinstalled for every Firefox profile (`mobius-firefox`, in `/usr/lib
 | Super+C | clipboard history |
 | Alt+Tab | next window |
 | Super+L | lock |
-| Alt+Shift+C (Firefox) | Claude sidebar |
 
 ## Status
 
