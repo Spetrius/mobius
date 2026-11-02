@@ -6,7 +6,7 @@
 #                     Anthropic SDK is bundled into it here, versions pinned by sdk/package-lock.json
 pkgname=mobius-firefox
 pkgver=2026.11.02
-pkgrel=1
+pkgrel=2
 pkgdesc='Mobius Firefox extensions: Claude sidebar, per-site Windows disguise'
 arch=('any')
 license=('MIT' 'Apache-2.0')
@@ -35,6 +35,12 @@ build() {
 package() {
   install -Dm644 "$srcdir/windows-disguise.xpi" "$pkgdir/$_extdir/windows-disguise@mobius.local.xpi"
   install -Dm644 "$srcdir/claude-sidebar.xpi"   "$pkgdir/$_extdir/claude-sidebar@mobius.local.xpi"
+  # Firefox only looks in its own extension folder at startup if told to (default: only after a
+  # Firefox update), so new or updated Mobius extensions would otherwise go unnoticed.
+  install -Dm644 /dev/stdin "$pkgdir/usr/lib/firefox/browser/defaults/preferences/mobius.js" <<'END'
+// Scan Firefox's own extension folder (application scope = 4) at every startup
+pref("extensions.startupScanScopes", 4);
+END
   install -Dm644 "$srcdir/sdk/node_modules/@anthropic-ai/sdk/LICENSE" \
     "$pkgdir/usr/share/licenses/$pkgname/anthropic-sdk-LICENSE"
 }
