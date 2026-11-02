@@ -19,6 +19,7 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 | Installer, fresh mode, UEFI | Full run in a VM, no test shortcuts: partitioning, btrfs subvolumes, 992 packages (Steam, Wine, Lutris, LibreOffice...), user, services, snapper, Limine registered in UEFI NVRAM |
 | Installer, reuse mode | VM, over a real Mobius install: kept `@home` (marker file intact, same owner), kept the old root as `@-old-<date>` with its snapshots, new system boots with nothing failed |
 | Installed system boots | Limine (via its UEFI entry), linux-mobius kernel, greetd/tuigreet login, Hyprland session with Waybar, wallpaper and autostart |
+| Firefox Windows disguise | On spetlin (2026-11-02): loads from the app extension folder, the school portal shows hours with the toolbar button on and the global about:config overrides removed |
 
 ## Bugs the tests caught (all fixed)
 - Installer silently exited when looking up the serial of a whole disk.
@@ -36,7 +37,6 @@ All testing so far happened in a cloud sandbox (Ubuntu host, Arch chroot, QEMU w
 - Repo reachability check used a HEAD request, which GitHub's download links reject.
 
 ## Not yet verified
-- **Firefox Windows disguise (`mobius-firefox`)**: loads in real Firefox (after the `extensions.startupScanScopes` fix). Portal test pending.
 - **reuse mode over CachyOS specifically**: tested over a Mobius install in a VM, not over CachyOS's layout. Run `mobius-install --dry-run` first on the real machine.
 - **Installed on spetlin (2026-10-20)**: reuse mode over CachyOS worked, desktop and autostart came up. Helldivers 2 crashed mid-mission on Proton Experimental (STATUS_INVALID_HANDLE); GE-Proton being tested.
 - **Hyprland 0.56 `hyprctl dispatch` takes Lua**: hypridle's `dpms off` line was silently broken; fixed to `hl.dsp.dpms({ action = "off" })` (confirmed working on spetlin).
