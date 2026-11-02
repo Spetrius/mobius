@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="sidebar.css">
+</head>
+<body>
+  <header>
+    <span class="title">Claude</span>
+    <button id="attach-page" title="Attach the current page">Page</button>
+    <button id="new-chat" title="Start a new chat">New</button>
+    <button id="toggle-settings" title="Settings">Key</button>
+  </header>
+
+  <section id="settings" hidden>
+    <p>Your Claude API key, from console.anthropic.com (API usage is billed separately from a Claude subscription). It is kept in this Firefox profile only.</p>
+    <form id="key-form">
+      <input id="api-key" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
+      <button>Save</button>
+    </form>
+    <p class="hint" id="key-status"></p>
+  </section>
+
+  <main id="log"></main>
+
+  <footer>
+    <div id="chips"></div>
+    <form id="ask">
+      <textarea id="prompt" rows="3" placeholder="Ask Claude (Enter sends, Shift+Enter for a new line)"></textarea>
+      <button id="send">Send</button>
+    </form>
+  </footer>
+  <script type="module" src="sidebar.js"></script>
+</body>
+</html>

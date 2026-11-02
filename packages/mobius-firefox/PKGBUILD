@@ -1,0 +1,40 @@
+# Firefox extensions for Mobius, installed for every profile in Firefox's own extension folder.
+# Arch builds Firefox with unsigned add-ons allowed in that folder (--with-unsigned-addon-scopes=app),
+# so they need no addons.mozilla.org signing.
+#   windows-disguise: per-site Windows disguise for portals that refuse Linux (toolbar button)
+#   claude-sidebar:   Claude in the sidebar (Alt+Shift+C), with the user's own API key; the official
+#                     Anthropic SDK is bundled into it here, versions pinned by sdk/package-lock.json
+pkgname=mobius-firefox
+pkgver=2026.11.02
+pkgrel=1
+pkgdesc='Mobius Firefox extensions: Claude sidebar, per-site Windows disguise'
+arch=('any')
+license=('MIT' 'Apache-2.0')
+depends=(firefox)
+makedepends=(npm zip)
+
+_extdir=usr/lib/firefox/browser/extensions
+
+build() {
+  rm -rf "$srcdir/sdk" "$srcdir/ext"
+  cp -a "$startdir/sdk" "$startdir/ext" "$srcdir/"
+
+  cd "$srcdir/sdk"
+  npm ci --no-audit --no-fund --ignore-scripts --cache "$srcdir/npm-cache"
+  mkdir -p "$srcdir/ext/claude-sidebar/vendor"
+  node node_modules/esbuild/bin/esbuild entry.js --bundle --format=esm --platform=browser \
+    --target=firefox128 --minify --legal-comments=eof \
+    --outfile="$srcdir/ext/claude-sidebar/vendor/anthropic.mjs"
+
+  local e
+  for e in windows-disguise claude-sidebar; do
+    (cd "$srcdir/ext/$e" && zip -qrX9 "$srcdir/$e.xpi" .)
+  done
+}
+
+package() {
+  install -Dm644 "$srcdir/windows-disguise.xpi" "$pkgdir/$_extdir/windows-disguise@mobius.local.xpi"
+  install -Dm644 "$srcdir/claude-sidebar.xpi"   "$pkgdir/$_extdir/claude-sidebar@mobius.local.xpi"
+  install -Dm644 "$srcdir/sdk/node_modules/@anthropic-ai/sdk/LICENSE" \
+    "$pkgdir/usr/share/licenses/$pkgname/anthropic-sdk-LICENSE"
+}

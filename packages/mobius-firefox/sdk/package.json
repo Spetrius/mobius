@@ -1,0 +1,11 @@
+{
+  "name": "mobius-claude-sidebar-sdk",
+  "private": true,
+  "description": "Bundles the official Anthropic SDK into one browser module for the Claude sidebar",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
