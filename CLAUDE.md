@@ -21,7 +21,7 @@ Personal Arch-based distro for `spetlin` (Ryzen 7 5800X3D, RX 9060 XT 16GB RDNA4
 - Boot guard (`mobius-settings`): pre-transaction hook aborts kernel/initramfs/microcode changes if `/boot` is not a mounted vfat; post-transaction checks each kernel by sha256 on `/boot`.
 - Repo hosting: GitHub release `repo` on this repository. Release assets can't contain `:`, so `build-repo.sh` strips `epoch=` from AUR PKGBUILDs.
 - Claude Desktop: repack of Anthropic's official .deb. `update.sh` verifies key `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE` -> signed InRelease -> Packages -> .deb. Claude Code: native binary, auto-updater disabled via `/etc/claude-code/managed-settings.json`.
-- Firefox extensions (`mobius-firefox`): unsigned MV2 XPIs in `/usr/lib/firefox/browser/extensions/<id>.xpi` (Arch Firefox allows unsigned add-ons in the app scope, so no AMO signing). The Claude sidebar uses the official `@anthropic-ai/sdk`, bundled with esbuild in `build()`; versions pinned in `packages/mobius-firefox/sdk/package-lock.json`. The API key is entered by the user and never shipped.
+- Firefox extensions (`mobius-firefox`): unsigned MV2 XPIs in `/usr/lib/firefox/browser/extensions/<id>.xpi` (Arch Firefox allows unsigned add-ons in the app scope, so no AMO signing); a default pref sets `extensions.startupScanScopes` to 4 so Firefox notices them. Only the per-site Windows disguise ships. A Claude API sidebar was built and removed: the owner doesn't want API billing on top of the subscription.
 - protonup-qt was dropped (pulled a chain of AUR Python libs); GE-Proton comes from our repo, Lutris manages its own runners.
 
 ## Layout

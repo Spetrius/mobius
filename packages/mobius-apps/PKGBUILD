@@ -1,7 +1,7 @@
 # Everyday apps on top of the desktop: phone link, sync, photography, study.
 pkgname=mobius-apps
 pkgver=2026.10.28
-pkgrel=4
+pkgrel=5
 pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, OBS, photography and study tools'
 arch=('any')
 license=('MIT')
@@ -17,7 +17,7 @@ depends=(
   # Recording and streaming (screen capture through PipeWire + xdg-desktop-portal-hyprland;
   # hardware encoding: VAAPI on the Radeon, NVENC on the laptop RTX). Not autostarted.
   obs-studio
-  # Firefox extensions: Claude sidebar, per-site Windows disguise for the school portal
+  # Firefox: per-site Windows disguise for the school portal
   mobius-firefox
 )
 install=mobius-apps.install
