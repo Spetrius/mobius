@@ -1,8 +1,8 @@
 # Everyday apps on top of the desktop: phone link, sync, photography, study.
 pkgname=mobius-apps
 pkgver=2026.10.28
-pkgrel=5
-pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, OBS, photography and study tools'
+pkgrel=6
+pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, OBS, photography, study tools, LM Studio'
 arch=('any')
 license=('MIT')
 depends=(
@@ -19,6 +19,9 @@ depends=(
   obs-studio
   # Firefox: per-site Windows disguise for the school portal
   mobius-firefox
+  # Local AI models (LM Studio, official AppImage via the AUR lmstudio-bin, rebuilt into our repo).
+  # GPU runs: Vulkan on the Radeon, CUDA on the laptop RTX.
+  lmstudio-bin
 )
 install=mobius-apps.install
 
