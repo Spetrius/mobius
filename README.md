@@ -16,7 +16,7 @@ Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and syste
 | Claude | Claude Code CLI and Claude Desktop, both repacked from Anthropic's official builds, updated through pacman |
 | VPN | Proton VPN (Arch's `proton-vpn-gtk-app`), starts minimized to the tray at login |
 | Firefox | `mobius-firefox`: a toolbar button that makes one site believe you run Windows (the school portal) |
-| Apps | `mobius-apps`: KDE Connect (phone link), Syncthing (folder sync), OBS Studio, darktable, RawTherapee, GIMP, gphoto2, Anki, Obsidian, Xournal++ |
+| Apps | `mobius-apps`: KDE Connect (phone link), Syncthing (folder sync), OBS Studio, darktable, RawTherapee, GIMP, gphoto2, Anki, Obsidian, Xournal++, LM Studio (run AI models locally) |
 
 ### Things it fixes from the old setup
 - **Boot guard.** pacman refuses to touch kernels if `/boot` isn't mounted, and after every update it checks that each kernel really landed on the EFI partition. That's the Sep 29 failure, blocked automatically.
