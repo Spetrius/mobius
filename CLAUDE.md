@@ -27,6 +27,7 @@ Personal Arch-based distro for `spetlin` (Ryzen 7 5800X3D, RX 9060 XT 16GB RDNA4
 ## Layout
 - `packages/<name>/PKGBUILD` (+ `files/` tree copied verbatim into the package)
 - `packages/aur.list`: AUR packages rebuilt into our repo, `name commit`, in dependency order
+- `packages/aur-fixes/<name>.sh`: our fix for a broken AUR package, appended to its PKGBUILD by `build-repo.sh` (pkgrel gets `.1`). Wrap upstream functions (`eval "_upstream_$(declare -f package)"`) rather than patch lines, so weekly bumps keep applying
 - `build/config.sh`: GitHub owner/repo, package build order
 - `build/build-repo.sh`: builds everything into `out/repo`, skips packages whose exact version already exists. `SKIP_PKGS=`, `KEEP_GOING=1`.
 - `build/build-iso.sh`: releng profile + installer. No offline repo: GitHub release assets must be < 2 GB, so the installer downloads Mobius packages from the `repo` release
