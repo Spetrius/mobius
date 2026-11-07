@@ -1,7 +1,7 @@
 # Everything CachyOS ships for gaming, from Arch repos plus a few rebuilt AUR packages.
 pkgname=mobius-gaming
 pkgver=2026.10.18
-pkgrel=2
+pkgrel=3
 pkgdesc='Mobius Linux gaming stack: Steam, Proton-GE, Lutris, Wine, GameMode, MangoHud, gamescope, RADV'
 arch=('any')
 license=('MIT')
@@ -11,6 +11,8 @@ depends=(
   vulkan-tools mesa-utils
   # Launchers and runtimes
   steam lutris umu-launcher protontricks proton-ge-custom-bin
+  # Official Minecraft Launcher (Mojang tarball via the AUR; it brings its own Java and updates itself)
+  minecraft-launcher
   wine-staging winetricks wine-mono wine-gecko vkd3d lib32-vkd3d
   # Wine runtime libs (the optional ones games actually hit)
   lib32-gnutls lib32-libpulse lib32-alsa-plugins lib32-alsa-lib
