@@ -12,7 +12,7 @@ Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and syste
 | Tuning | `mobius-settings`: CachyOS sysctl / zram / udev / I/O scheduler / systemd defaults, ananicy-cpp rules, ntsync, plus the **boot guard** |
 | Boot | Limine + btrfs + snapper, snapshot entries in the boot menu (limine-snapper-sync), same recovery path that saved you on Sep 29 |
 | Desktop | Hyprland 0.56 with a Lua config written for this machine, **no UWSM**, greetd + tuigreet login, Waybar, Mako, Fuzzel, Alacritty, fish |
-| Gaming | Steam, GE-Proton (packaged in our repo), Lutris, Wine Staging, umu, protontricks, GameMode, MangoHud, gamescope, RADV only, LACT, amdgpu_top |
+| Gaming | Steam, GE-Proton (packaged in our repo), Minecraft Launcher, Lutris, Wine Staging, umu, protontricks, GameMode, MangoHud, gamescope, RADV only, LACT, amdgpu_top |
 | Claude | Claude Code CLI and Claude Desktop, both repacked from Anthropic's official builds, updated through pacman |
 | VPN | Proton VPN (Arch's `proton-vpn-gtk-app`), starts minimized to the tray at login |
 | Firefox | `mobius-firefox`: a toolbar button that makes one site believe you run Windows (the school portal) |
