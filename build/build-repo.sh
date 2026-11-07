@@ -116,6 +116,12 @@ while read -r name commit; do
     git -C "$d" fetch -q origin && git -C "$d" checkout -q --force "$commit"
     # GitHub release assets can't hold ':' so epoch'd filenames (1:foo) would 404. Drop the epoch.
     sed -i '/^epoch=/d' "$d/PKGBUILD"
+    # Our fix for a broken AUR package: packages/aur-fixes/<name>.sh is appended to its PKGBUILD,
+    # and pkgrel gets ".1" so the fixed build is newer than the unfixed one with the same version.
+    if [[ -f "$root/packages/aur-fixes/$name.sh" ]]; then
+        sed -i -E 's/^pkgrel=([0-9]+)$/pkgrel=\1.1/' "$d/PKGBUILD"
+        cat "$root/packages/aur-fixes/$name.sh" >> "$d/PKGBUILD"
+    fi
     build_dir "$d"
 done < "$root/packages/aur.list"
 
