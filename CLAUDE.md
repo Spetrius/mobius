@@ -22,6 +22,7 @@ Personal Arch-based distro for `spetlin` (Ryzen 7 5800X3D, RX 9060 XT 16GB RDNA4
 - Repo hosting: GitHub release `repo` on this repository. Release assets can't contain `:`, so `build-repo.sh` strips `epoch=` from AUR PKGBUILDs.
 - Claude Desktop: repack of Anthropic's official .deb. `update.sh` verifies key `31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE` -> signed InRelease -> Packages -> .deb. Claude Code: native binary, auto-updater disabled via `/etc/claude-code/managed-settings.json`.
 - Firefox extensions (`mobius-firefox`): unsigned MV2 XPIs in `/usr/lib/firefox/browser/extensions/<id>.xpi` (Arch Firefox allows unsigned add-ons in the app scope, so no AMO signing); a default pref sets `extensions.startupScanScopes` to 4 so Firefox notices them. Only the per-site Windows disguise ships. A Claude API sidebar was built and removed: the owner doesn't want API billing on top of the subscription.
+- Private apps (`mobius-private`): software we may not redistribute (VEX TM) lives in the GitHub release `private`, age-encrypted to one X25519 key. `master.age` is that key locked with the owner's passphrase; unlocked machines keep it in `/etc/mobius/private.key`. Never upload anything unencrypted there, and never handle the passphrase or key yourself: the owner runs `init`, `unlock` and `add`.
 - protonup-qt was dropped (pulled a chain of AUR Python libs); GE-Proton comes from our repo, Lutris manages its own runners.
 
 ## Layout

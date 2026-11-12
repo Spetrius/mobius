@@ -1,0 +1,176 @@
+#!/bin/bash
+# mobius-private: your private apps (VEX TM and the like), kept in the public Mobius release
+# but encrypted, so only machines that know your private password can use them.
+#
+#   Release "private" on the Mobius GitHub repo holds:
+#     master.age     the private key, locked with your private password (age passphrase, scrypt)
+#     recipient.txt  the matching public key; anyone can encrypt to it, only the key decrypts
+#     index.age      encrypted list of apps: name, sha256, asset
+#     <name>-<sha>.age  each app, encrypted
+#   A machine that was unlocked keeps the key in /etc/mobius/private.key (root only), so
+#   mobius-update can install new versions without asking for the password again.
+#
+# Commands:
+#   init                  once, ever: make the key, choose the password, upload (needs gh auth)
+#   unlock                on another machine: enter the password once, the key is saved
+#   add FILE.flatpak [NAME]  encrypt and upload an app, or a new version of it (needs gh auth)
+#   remove NAME           take an app off the list (stays installed where it is)
+#   list | status         what is there and what is installed
+#   sync                  install new or changed apps (mobius-update runs this)
+set -euo pipefail
+
+GH="${MOBIUS_GH:-@MOBIUS_GH@}"
+TAG=private
+URL="${MOBIUS_PRIVATE_URL:-https://github.com/$GH/releases/download/$TAG}"
+KEY="${MOBIUS_PRIVATE_KEY:-/etc/mobius/private.key}"
+STATE="${MOBIUS_PRIVATE_STATE:-/var/lib/mobius/private.state}"   # "name sha256" of what is installed
+
+die()  { echo "mobius-private: $*" >&2; exit 1; }
+say()  { echo ":: $*"; }
+root() { if [[ $EUID -eq 0 ]]; then "$@"; else sudo "$@"; fi; }
+tmp="$(mktemp -d -p /var/tmp mobius-private.XXXXXX)"
+trap 'rm -rf "$tmp"' EXIT
+
+fetch()     { curl -fsSL --retry 3 -o "$2" "$URL/$1"; }
+exists()    { curl -fsL -r 0-0 -o /dev/null "$URL/$1"; }   # GET: GitHub download links reject HEAD
+have_key()  { root test -s "$KEY"; }
+need_key()  { have_key || die "this machine is not unlocked yet. Run: mobius-private unlock"; }
+need_gh()   { gh auth status >/dev/null 2>&1 || die "GitHub login needed for uploads. Run: gh auth login"; }
+decrypt()   { root age -d -i "$KEY" "$1" >"$2"; }   # via the shell, so an empty list still makes a file
+recipient() { fetch recipient.txt "$tmp/recipient.txt"; tr -d '[:space:]' <"$tmp/recipient.txt"; }
+
+save_key() { # $1 = decrypted identity file
+    grep -q '^AGE-SECRET-KEY-' "$1" || die "that is not a Mobius private key"
+    root install -Dm600 -o root -g root "$1" "$KEY"
+    shred -u "$1" 2>/dev/null || rm -f "$1"
+}
+
+read_index() { # -> $tmp/index ("name sha256 asset" per line)
+    fetch index.age "$tmp/index.age" || die "no private apps set up yet. Run: mobius-private init"
+    decrypt "$tmp/index.age" "$tmp/index"
+}
+
+write_index() { # encrypt $tmp/index and upload it
+    age -r "$(recipient)" -o "$tmp/index.age" "$tmp/index"
+    gh release upload "$TAG" "$tmp/index.age" -R "$GH" --clobber >/dev/null
+}
+
+cmd_init() {
+    need_gh
+    if exists master.age; then die "already set up. On a new machine use: mobius-private unlock"; fi
+    gh release view "$TAG" -R "$GH" >/dev/null 2>&1 || gh release create "$TAG" -R "$GH" --latest=false \
+        --title "Mobius private apps (encrypted)" \
+        --notes "Encrypted with age. Useless without the owner's private password. Managed by mobius-private." >/dev/null
+    (umask 077; age-keygen -o "$tmp/id" 2>/dev/null)
+    age-keygen -y "$tmp/id" >"$tmp/recipient.txt"
+    echo "Choose your Mobius private password. Make it long: four or five random words."
+    echo "Keep it in a password manager. Without it, new installs can't get your private apps."
+    age -p -o "$tmp/master.age" "$tmp/id"
+    : >"$tmp/index"
+    age -r "$(tr -d '[:space:]' <"$tmp/recipient.txt")" -o "$tmp/index.age" "$tmp/index"
+    gh release upload "$TAG" "$tmp/master.age" "$tmp/recipient.txt" "$tmp/index.age" -R "$GH" >/dev/null
+    save_key "$tmp/id"
+    say "Private apps are set up and this machine is unlocked."
+    echo "Add an app with: mobius-private add /path/to/app.flatpak NAME"
+}
+
+cmd_unlock() {
+    fetch master.age "$tmp/master.age" || die "no private apps set up yet (no master.age in the release)"
+    echo "Enter your Mobius private password."
+    age -d -o "$tmp/id" "$tmp/master.age" || die "wrong password"
+    [[ "$(age-keygen -y "$tmp/id")" == "$(recipient)" ]] || die "key does not match recipient.txt"
+    save_key "$tmp/id"
+    say "This machine is unlocked. Private apps install with the next mobius-update (or: mobius-private sync)."
+}
+
+cmd_add() {
+    local file="${1:-}" name="${2:-}" sha asset old
+    [[ -f "$file" ]] || die "usage: mobius-private add FILE.flatpak [NAME]"
+    need_key; need_gh
+    [[ -n "$name" ]] || name="$(basename "$file")"
+    name="$(tr 'A-Z' 'a-z' <<<"${name%.flatpak}" | tr -cs 'a-z0-9.-' '-')"; name="${name%-}"
+    [[ -n "$name" ]] || die "give the app a name: mobius-private add FILE NAME"
+    sha="$(sha256sum "$file" | cut -d' ' -f1)"
+    asset="$name-${sha:0:12}.age"
+    read_index
+    old="$(awk -v n="$name" '$1 == n { print $3 }' "$tmp/index")"
+    if [[ "$old" == "$asset" ]]; then say "$name: this exact file is already there"; return; fi
+    say "Encrypting $(basename "$file") ($(du -h "$file" | cut -f1))"
+    age -r "$(recipient)" -o "$tmp/$asset" "$file"
+    say "Uploading the encrypted copy"
+    gh release upload "$TAG" "$tmp/$asset" -R "$GH" --clobber >/dev/null
+    awk -v n="$name" '$1 != n' "$tmp/index" >"$tmp/index.new"
+    echo "$name $sha $asset" >>"$tmp/index.new"
+    mv "$tmp/index.new" "$tmp/index"
+    write_index
+    [[ -n "$old" ]] && gh release delete-asset "$TAG" "$old" -R "$GH" -y >/dev/null 2>&1 || true
+    say "$name added. Every unlocked machine installs it with its next mobius-update."
+}
+
+cmd_remove() {
+    local name="${1:-}" old
+    [[ -n "$name" ]] || die "usage: mobius-private remove NAME"
+    need_key; need_gh; read_index
+    old="$(awk -v n="$name" '$1 == n { print $3 }' "$tmp/index")"
+    [[ -n "$old" ]] || die "no app called $name"
+    awk -v n="$name" '$1 != n' "$tmp/index" >"$tmp/index.new"; mv "$tmp/index.new" "$tmp/index"
+    write_index
+    gh release delete-asset "$TAG" "$old" -R "$GH" -y >/dev/null 2>&1 || true
+    say "$name removed from the list. Where it's installed, remove it with: flatpak uninstall"
+}
+
+cmd_list() {
+    if ! have_key; then
+        if exists master.age; then echo "Private apps exist; this machine is locked (mobius-private unlock)."
+        else echo "No private apps set up (mobius-private init)."; fi
+        return
+    fi
+    read_index
+    if [[ ! -s "$tmp/index" ]]; then echo "Unlocked. No private apps yet."; return; fi
+    local name sha asset st
+    echo "Unlocked. Private apps:"
+    while read -r name sha asset; do
+        st="not installed yet"
+        if root test -f "$STATE" && root grep -qx "$name $sha" "$STATE"; then st="installed, current"
+        elif root test -f "$STATE" && root grep -q "^$name " "$STATE"; then st="update waiting"; fi
+        echo "   $name  ($st)"
+    done <"$tmp/index"
+}
+
+cmd_sync() {
+    have_key || exit 0                   # locked machine: nothing to do, quietly
+    exists index.age || exit 0           # nothing set up yet
+    read_index
+    [[ -s "$tmp/index" ]] || exit 0
+    root mkdir -p "$(dirname "$STATE")"; root touch "$STATE"
+    local name sha asset got changed=0
+    while read -r name sha asset; do
+        root grep -qx "$name $sha" "$STATE" && continue
+        say "Private app: $name"
+        fetch "$asset" "$tmp/$asset" || { echo "   download failed, will retry next update"; continue; }
+        decrypt "$tmp/$asset" "$tmp/$name.flatpak"
+        got="$(sha256sum "$tmp/$name.flatpak" | cut -d' ' -f1)"
+        [[ "$got" == "$sha" ]] || { echo "   checksum mismatch, skipped"; rm -f "$tmp/$name.flatpak"; continue; }
+        root flatpak remote-add --system --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+        if root flatpak install --system --noninteractive -y --reinstall --bundle "$tmp/$name.flatpak"; then
+            root sed -i "/^$name /d" "$STATE"
+            echo "$name $sha" | root tee -a "$STATE" >/dev/null
+            changed=1
+        else
+            echo "   flatpak install failed, will retry next update"
+        fi
+        rm -f "$tmp/$name.flatpak" "$tmp/$asset"
+    done <"$tmp/index"
+    (( changed )) && say "Private apps are up to date." || true
+}
+
+case "${1:-status}" in
+    init)          cmd_init ;;
+    unlock)        cmd_unlock ;;
+    add)           shift; cmd_add "$@" ;;
+    remove)        shift; cmd_remove "$@" ;;
+    list|status)   cmd_list ;;
+    sync)          cmd_sync ;;
+    -h|--help|help) sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *)             die "unknown command $1 (try: mobius-private help)" ;;
+esac
