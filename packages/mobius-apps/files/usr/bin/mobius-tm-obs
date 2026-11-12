@@ -314,7 +314,7 @@ def probe(cfg):
             continue
         answered = True
         verdict = "WORKS" if code == 200 else f"refused ({code})"
-        print(f"  {verdict:<14} {label}" + (f": {body.strip()[:80]}" if code == 200 else ""))
+        print(f"  {verdict:<14} {label}" + (f": {' '.join(body.split())[:100]}" if body.strip() else ""))
         if code in (404, 503):
             print("         (TM's API is off: Tools > Options > Web Publishing > Enable Local TM API)")
         works = works or (mode if code == 200 else None)
