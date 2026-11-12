@@ -65,7 +65,7 @@ jobs:
         if: always() && hashFiles('out/repo/mobius.db.tar.zst') != ''
         run: |
           docker run --rm -v "$PWD:/src" -w /src archlinux:base-devel bash -euxc '
-              pacman -Sy --noconfirm --needed archlinux-keyring python
+              pacman -Sy --noconfirm --needed archlinux-keyring && pacman -Su --noconfirm && pacman -S --noconfirm --needed python
               build/test-repo.sh out/repo
             '
 
