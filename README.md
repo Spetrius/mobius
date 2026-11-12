@@ -130,6 +130,18 @@ It comes preinstalled for every Firefox profile (`mobius-firefox`, in `/usr/lib/
 
 **Windows Disguise**: on a site that refuses Linux, click the Windows button in the toolbar. That site (and its subdomains) now sees Windows, the page reloads, and the button shows **WIN**. Click again to turn it off. The list is also under about:addons > Mobius Windows Disguise > Preferences.
 
+## VEX TM to OBS
+
+`mobius-tm-obs` switches OBS to the right field's camera as Tournament Manager queues, activates, starts and stops matches (TM Public API v1.2: OAuth sign-in, signed requests, field set websocket; OBS WebSocket 5). It only switches your OBS scenes, never TM's displays.
+
+1. Once: VEX/DWAB approves your TM API request and sends a Client ID and Client Secret.
+2. OBS: Tools > WebSocket Server Settings, enable it and set a password.
+3. TM, each event: Tools > Options > Web Publishing > Enable Local TM API, copy the key.
+4. `mobius-tm-obs setup` (first time: credentials, addresses, field set, a scene per field, optional after-match scene), or `mobius-tm-obs key` at later events.
+5. `mobius-tm-obs test`, then `mobius-tm-obs` to run. The DWAB sign-in needs internet at the venue.
+
+Settings live in `~/.config/mobius/tm-obs.json` (mode 600), never in this repo.
+
 ## Private apps
 
 Apps you can't publish, like VEX TM, are stored encrypted in the public `private` release. Anyone can download them, but only machines unlocked with your private password can use them. `mobius-private` (in `mobius-settings`, built on `age`):
