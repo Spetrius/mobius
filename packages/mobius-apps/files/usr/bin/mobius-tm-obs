@@ -1,0 +1,389 @@
+#!/usr/bin/env python3
+"""mobius-tm-obs: switch OBS scenes from VEX Tournament Manager.
+
+Built from the TM Public API Guide v1.2. It only switches your OBS scenes: it never
+replaces, covers or imitates TM's own displays, timers or branding (the API's usage rules).
+
+  mobius-tm-obs setup     credentials, TM and OBS addresses, field set, field -> scene map
+  mobius-tm-obs key       paste this event's TM API key (TM makes a new one every event)
+  mobius-tm-obs test      check DWAB sign-in, TM and OBS without switching anything
+  mobius-tm-obs           run: switch scenes as TM queues, activates, starts and stops matches
+
+Settings: ~/.config/mobius/tm-obs.json (mode 600; holds your DWAB client secret, the TM
+API key and the OBS password, so it never leaves this machine).
+"""
+import asyncio
+import base64
+import email.utils
+import getpass
+import hashlib
+import hmac
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+try:
+    from websockets.asyncio.client import connect as ws_connect
+    from websockets.exceptions import ConnectionClosed, InvalidStatus
+except ImportError:  # pragma: no cover
+    sys.exit("mobius-tm-obs needs python-websockets: sudo pacman -S python-websockets")
+
+CONFIG = os.path.expanduser(os.environ.get("MOBIUS_TM_OBS_CONFIG", "~/.config/mobius/tm-obs.json"))
+DEFAULTS = {
+    "client_id": "", "client_secret": "",
+    "auth_url": "https://auth.vextm.dwabtech.com/oauth2/token",
+    "tm_url": "http://127.0.0.1", "tm_api_key": "",
+    "obs_url": "ws://127.0.0.1:4455", "obs_password": "",
+    "field_set": None, "field_set_name": "",
+    "scenes": {},            # field id (string) -> OBS scene name
+    "switch_on": ["fieldMatchAssigned", "fieldActivated", "matchStarted"],
+    "after_match_scene": "",  # optional scene once a match stops ("" = stay on the field)
+    "after_match_delay": 5.0, # seconds after matchStopped before switching there
+    "delay": 0.0,             # seconds to wait before any switch
+    "min_hold": 3.0,          # never switch again sooner than this after the last switch
+}
+
+
+def log(msg):
+    print(time.strftime("%H:%M:%S"), msg, flush=True)
+
+
+# ------------------------------------------------------------------ settings
+
+def load():
+    cfg = dict(DEFAULTS)
+    if os.path.exists(CONFIG):
+        with open(CONFIG) as f:
+            cfg.update(json.load(f))
+    return cfg
+
+
+def save(cfg):
+    os.makedirs(os.path.dirname(CONFIG), exist_ok=True)
+    fd = os.open(CONFIG + ".new", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(cfg, f, indent=2)
+    os.replace(CONFIG + ".new", CONFIG)
+
+
+def ask(prompt, current="", secret=False):
+    shown = ("(saved, Enter keeps it)" if current else "") if secret else (f"[{current}]" if current else "")
+    text = f"{prompt} {shown}: ".replace("  ", " ")
+    val = getpass.getpass(text) if secret else input(text)
+    return val.strip() or current
+
+
+# ------------------------------------------------------------------ TM API
+
+def tm_host(url):
+    """Host as signed: the port only when it is not the scheme's default (WHATWG URL.host)."""
+    p = urllib.parse.urlsplit(url)
+    host = p.hostname or ""
+    default = {"http": 80, "https": 443, "ws": 80, "wss": 443}.get(p.scheme)
+    return f"{host}:{p.port}" if p.port and p.port != default else host
+
+
+def sign(method, url, token, api_key, date=None):
+    """TM request signature: HMAC-SHA256(api key, StringToSign) as lowercase hex."""
+    date = date or email.utils.formatdate(usegmt=True)
+    p = urllib.parse.urlsplit(url)
+    path = (p.path or "/") + (f"?{p.query}" if p.query else "")
+    to_sign = f"{method}\n{path}\ntoken:{token}\nhost:{tm_host(url)}\nx-tm-date:{date}\n"
+    sig = hmac.new(api_key.encode(), to_sign.encode(), hashlib.sha256).hexdigest()
+    return date, sig
+
+
+class TM:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.token = None
+        self.expires = 0.0
+
+    def bearer(self):
+        """OAuth client credentials token, cached until 5 minutes before it expires."""
+        if self.token and time.time() < self.expires - 300:
+            return self.token
+        if not (self.cfg["client_id"] and self.cfg["client_secret"]):
+            raise RuntimeError("no DWAB client ID/secret yet: run mobius-tm-obs setup")
+        body = urllib.parse.urlencode({
+            "client_id": self.cfg["client_id"], "client_secret": self.cfg["client_secret"],
+            "grant_type": "client_credentials"}).encode()
+        req = urllib.request.Request(self.cfg["auth_url"], data=body, method="POST",
+                                     headers={"Content-Type": "application/x-www-form-urlencoded"})
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.load(r)
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"DWAB sign-in refused ({e.code}): check the client ID and secret") from None
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"DWAB sign-in unreachable ({e.reason}): this needs internet") from None
+        self.token = data["access_token"]
+        self.expires = time.time() + float(data.get("expires_in", 3600))
+        return self.token
+
+    def headers(self, url):
+        token = self.bearer()
+        date, sig = sign("GET", url, token, self.cfg["tm_api_key"])
+        return {"Authorization": f"Bearer {token}", "x-tm-date": date, "x-tm-signature": sig}
+
+    def get(self, path):
+        url = self.cfg["tm_url"].rstrip("/") + path
+        req = urllib.request.Request(url, headers=self.headers(url))
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code in (404, 503):
+                raise RuntimeError("TM answered, but its API is off: Tools > Options > Web Publishing > "
+                                   "Enable Local TM API") from None
+            if e.code == 401:
+                self.token = None
+                raise RuntimeError("TM refused the request (401): wrong TM API key for this event, or "
+                                   "this PC's clock is off") from None
+            raise RuntimeError(f"TM error {e.code} on {path}") from None
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"cannot reach TM at {self.cfg['tm_url']} ({e.reason})") from None
+
+    def ws_url(self, field_set):
+        base = self.cfg["tm_url"].rstrip("/")
+        return base.replace("https://", "wss://", 1).replace("http://", "ws://", 1) + f"/api/fieldsets/{field_set}"
+
+
+# ------------------------------------------------------------------ OBS websocket v5
+
+class OBS:
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.ws = None
+        self.n = 0
+
+    async def connect(self):
+        self.ws = await ws_connect(self.cfg["obs_url"], subprotocols=["obswebsocket.json"], open_timeout=10)
+        hello = json.loads(await self.ws.recv())
+        ident = {"rpcVersion": 1, "eventSubscriptions": 0}
+        auth = hello["d"].get("authentication")
+        if auth:
+            if not self.cfg["obs_password"]:
+                raise RuntimeError("OBS asks for a password: set it with mobius-tm-obs setup")
+            secret = base64.b64encode(hashlib.sha256((self.cfg["obs_password"] + auth["salt"]).encode()).digest())
+            ident["authentication"] = base64.b64encode(
+                hashlib.sha256(secret + auth["challenge"].encode()).digest()).decode()
+        await self.ws.send(json.dumps({"op": 1, "d": ident}))
+        try:
+            msg = json.loads(await self.ws.recv())
+        except ConnectionClosed:
+            raise RuntimeError("OBS refused the WebSocket password") from None
+        if msg.get("op") != 2:
+            raise RuntimeError("OBS refused the connection: wrong WebSocket password?")
+
+    async def request(self, rtype, data=None):
+        self.n += 1
+        rid = str(self.n)
+        await self.ws.send(json.dumps({"op": 6, "d": {"requestType": rtype, "requestId": rid,
+                                                       "requestData": data or {}}}))
+        while True:
+            msg = json.loads(await self.ws.recv())
+            if msg.get("op") == 7 and msg["d"].get("requestId") == rid:
+                st = msg["d"]["requestStatus"]
+                if not st.get("result"):
+                    raise RuntimeError(f"OBS {rtype} failed: {st.get('comment', st.get('code'))}")
+                return msg["d"].get("responseData", {})
+
+    async def scenes(self):
+        data = await self.request("GetSceneList")
+        return [s["sceneName"] for s in reversed(data.get("scenes", []))]   # OBS lists bottom-up
+
+    async def switch(self, scene):
+        await self.request("SetCurrentProgramScene", {"sceneName": scene})
+
+    async def close(self):
+        if self.ws:
+            await self.ws.close()
+
+
+# ------------------------------------------------------------------ commands
+
+def pick(title, options):
+    for i, (_, label) in enumerate(options, 1):
+        print(f"  {i}. {label}")
+    while True:
+        a = input(f"{title} (number): ").strip()
+        if a.isdigit() and 1 <= int(a) <= len(options):
+            return options[int(a) - 1][0]
+
+
+async def cmd_setup():
+    cfg = load()
+    print("DWAB API credentials (from VEX's TM API approval email):")
+    cfg["client_id"] = ask("  Client ID", cfg["client_id"])
+    cfg["client_secret"] = ask("  Client secret", cfg["client_secret"], secret=True)
+    print("Tournament Manager (the TM server's address; this PC if TM runs here):")
+    cfg["tm_url"] = ask("  TM address", cfg["tm_url"])
+    cfg["tm_api_key"] = ask("  TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"], secret=True)
+    print("OBS (Tools > WebSocket Server Settings):")
+    cfg["obs_url"] = ask("  OBS WebSocket address", cfg["obs_url"])
+    cfg["obs_password"] = ask("  OBS WebSocket password", cfg["obs_password"], secret=True)
+    save(cfg)
+
+    tm = TM(cfg)
+    sets = tm.get("/api/fieldsets")["fieldSets"]
+    print("Field sets in TM:")
+    cfg["field_set"] = pick("Which field set", [(s["id"], s["name"]) for s in sets])
+    cfg["field_set_name"] = next(s["name"] for s in sets if s["id"] == cfg["field_set"])
+    fields = tm.get(f"/api/fieldsets/{cfg['field_set']}/fields")["fields"]
+
+    obs = OBS(cfg)
+    await obs.connect()
+    names = await obs.scenes()
+    await obs.close()
+    opts = [(n, n) for n in names]
+    cfg["scenes"] = {}
+    for f in fields:
+        print(f"OBS scene for {f['name']}:")
+        cfg["scenes"][str(f["id"])] = pick("Scene", opts)
+    print("Scene after a match ends (results/wide shot), or keep the field's scene:")
+    cfg["after_match_scene"] = pick("Scene", [("", "keep the field's scene")] + opts)
+    save(cfg)
+    print(f"Saved to {CONFIG}. Start switching with: mobius-tm-obs")
+
+
+def cmd_key():
+    cfg = load()
+    cfg["tm_api_key"] = ask("This event's TM API key", "", secret=True) or cfg["tm_api_key"]
+    save(cfg)
+    print("Saved.")
+
+
+async def cmd_test():
+    cfg = load()
+    ok = True
+    tm = TM(cfg)
+    for name, fn in (("DWAB sign-in", tm.bearer), ("TM API", lambda: tm.get("/api/event")["event"]["name"])):
+        try:
+            r = fn()
+            print(f"ok    {name}" + (f": {r}" if name == "TM API" else ""))
+        except Exception as e:
+            ok = False
+            print(f"FAIL  {name}: {e}")
+            if name == "DWAB sign-in":
+                break
+    try:
+        obs = OBS(cfg)
+        await obs.connect()
+        names = await obs.scenes()
+        await obs.close()
+        missing = [s for s in cfg["scenes"].values() if s not in names]
+        print("ok    OBS" + (f" (scenes missing in OBS: {', '.join(missing)})" if missing else ""))
+        ok = ok and not missing
+    except Exception as e:
+        ok = False
+        print(f"FAIL  OBS: {e}")
+    return 0 if ok else 1
+
+
+class Director:
+    """Turns TM field set events into scene switches, with delay and minimum hold."""
+
+    def __init__(self, cfg, obs):
+        self.cfg, self.obs = cfg, obs
+        self.current = None
+        self.last_switch = 0.0
+        self.pending = None
+
+    def target(self, ev):
+        t = ev.get("type")
+        if t in self.cfg["switch_on"]:
+            return self.cfg["scenes"].get(str(ev.get("fieldID")))
+        return None
+
+    async def handle(self, ev):
+        t = ev.get("type")
+        log(f"TM: {t}" + (f" field {ev['fieldID']}" if "fieldID" in ev else ""))
+        if t == "matchStopped" and self.cfg["after_match_scene"]:
+            self.schedule(self.cfg["after_match_scene"], self.cfg["after_match_delay"])
+            return
+        scene = self.target(ev)
+        if scene:
+            self.schedule(scene, self.cfg["delay"])
+
+    def schedule(self, scene, delay):
+        if self.pending:
+            self.pending.cancel()
+        self.pending = asyncio.create_task(self._switch(scene, delay))
+
+    async def _switch(self, scene, delay):
+        wait = max(delay, self.cfg["min_hold"] - (time.monotonic() - self.last_switch))
+        if wait > 0:
+            await asyncio.sleep(wait)
+        if scene == self.current:
+            return
+        await self.obs.switch(scene)
+        self.current, self.last_switch = scene, time.monotonic()
+        log(f"OBS: switched to {scene}")
+
+
+async def cmd_run():
+    cfg = load()
+    if cfg["field_set"] is None or not cfg["scenes"]:
+        sys.exit("Not set up yet: run mobius-tm-obs setup")
+    tm = TM(cfg)
+    backoff = 2
+    while True:
+        obs = OBS(cfg)
+        try:
+            await obs.connect()
+            director = Director(cfg, obs)
+            url = tm.ws_url(cfg["field_set"])
+            async with ws_connect(url, additional_headers=tm.headers(url.replace("ws", "http", 1)),
+                                  open_timeout=10) as ws:
+                log(f"Connected: TM field set '{cfg['field_set_name']}' -> OBS. Ctrl+C stops.")
+                backoff = 2
+                async for raw in ws:
+                    try:
+                        ev = json.loads(raw)
+                    except ValueError:
+                        continue
+                    await director.handle(ev)
+                log("TM closed the connection")
+        except InvalidStatus as e:
+            code = e.response.status_code
+            log(f"TM refused the field set connection ({code})"
+                + (": check the TM API key and this PC's clock" if code == 401 else ""))
+            tm.token = None if code == 401 else tm.token
+        except (OSError, RuntimeError, asyncio.TimeoutError) as e:
+            log(f"Disconnected: {e}")
+        except Exception as e:  # websockets closes, unexpected payloads
+            log(f"Disconnected: {type(e).__name__}: {e}")
+        finally:
+            await obs.close()
+        log(f"Retrying in {backoff}s")
+        await asyncio.sleep(backoff)
+        backoff = min(backoff * 2, 30)
+
+
+def main():
+    cmd = sys.argv[1] if len(sys.argv) > 1 else "run"
+    try:
+        if cmd == "setup":
+            asyncio.run(cmd_setup())
+        elif cmd == "key":
+            cmd_key()
+        elif cmd == "test":
+            sys.exit(asyncio.run(cmd_test()))
+        elif cmd == "run":
+            asyncio.run(cmd_run())
+        else:
+            print(__doc__)
+            sys.exit(0 if cmd in ("-h", "--help", "help") else 1)
+    except KeyboardInterrupt:
+        print()
+    except RuntimeError as e:
+        sys.exit(f"mobius-tm-obs: {e}")
+
+
+if __name__ == "__main__":
+    main()

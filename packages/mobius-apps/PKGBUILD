@@ -1,7 +1,7 @@
 # Everyday apps on top of the desktop: phone link, sync, photography, study.
 pkgname=mobius-apps
 pkgver=2026.10.28
-pkgrel=7
+pkgrel=8
 pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, OBS, photography, study tools, LM Studio, Bambu Studio'
 arch=('any')
 license=('MIT')
@@ -24,6 +24,8 @@ depends=(
   lmstudio-bin
   # 3D printing: Bambu Studio for the P1S + AMS (official AppImage via the AUR bambustudio-bin)
   bambustudio-bin
+  # mobius-tm-obs: VEX Tournament Manager -> OBS scene switching (TM Public API)
+  python-websockets
 )
 install=mobius-apps.install
 
