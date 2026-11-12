@@ -7,6 +7,7 @@ replaces, covers or imitates TM's own displays, timers or branding (the API's us
   mobius-tm-obs setup     credentials, TM and OBS addresses, field set, field -> scene map
   mobius-tm-obs key       paste this event's TM API key (TM makes a new one every event)
   mobius-tm-obs test      check DWAB sign-in, TM and OBS without switching anything
+  mobius-tm-obs probe     ask your TM how it wants to be signed in to (with or without VEX credentials)
   mobius-tm-obs           run: switch scenes as TM queues, activates, starts and stops matches
 
 Settings: ~/.config/mobius/tm-obs.json (mode 600; holds your DWAB client secret, the TM
@@ -36,6 +37,10 @@ CONFIG = os.path.expanduser(os.environ.get("MOBIUS_TM_OBS_CONFIG", "~/.config/mo
 DEFAULTS = {
     "client_id": "", "client_secret": "",
     "auth_url": "https://auth.vextm.dwabtech.com/oauth2/token",
+    # How requests to TM are signed in: "dwab" (the guide: VEX-issued token + TM key signature),
+    # "keyonly" (TM key signature over an empty token, no VEX sign-in), "none" (no auth headers).
+    # "mobius-tm-obs probe" finds out which one your TM accepts.
+    "auth_mode": "dwab",
     "tm_url": "http://127.0.0.1", "tm_api_key": "",
     "obs_url": "ws://127.0.0.1:4455", "obs_password": "",
     "field_set": None, "field_set_name": "",
@@ -125,10 +130,26 @@ class TM:
         self.expires = time.time() + float(data.get("expires_in", 3600))
         return self.token
 
-    def headers(self, url):
-        token = self.bearer()
+    def headers(self, url, mode=None):
+        mode = mode or self.cfg.get("auth_mode", "dwab")
+        if mode == "none":
+            return {}
+        token = self.bearer() if mode == "dwab" else ""
         date, sig = sign("GET", url, token, self.cfg["tm_api_key"])
-        return {"Authorization": f"Bearer {token}", "x-tm-date": date, "x-tm-signature": sig}
+        h = {"x-tm-date": date, "x-tm-signature": sig}
+        if token:
+            h["Authorization"] = f"Bearer {token}"
+        return h
+
+    def status(self, path, mode):
+        """HTTP status TM gives this request in this auth mode, plus a short body excerpt."""
+        url = self.cfg["tm_url"].rstrip("/") + path
+        try:
+            req = urllib.request.Request(url, headers=self.headers(url, mode))
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return r.status, r.read(200).decode(errors="replace")
+        except urllib.error.HTTPError as e:
+            return e.code, e.read(200).decode(errors="replace")
 
     def get(self, path):
         url = self.cfg["tm_url"].rstrip("/") + path
@@ -218,9 +239,10 @@ def pick(title, options):
 
 async def cmd_setup():
     cfg = load()
-    print("DWAB API credentials (from VEX's TM API approval email):")
+    print("DWAB API credentials (from VEX's TM API approval email; Enter to skip if you have none):")
     cfg["client_id"] = ask("  Client ID", cfg["client_id"])
-    cfg["client_secret"] = ask("  Client secret", cfg["client_secret"], secret=True)
+    if cfg["client_id"]:
+        cfg["client_secret"] = ask("  Client secret", cfg["client_secret"], secret=True)
     print("Tournament Manager (the TM server's address; this PC if TM runs here):")
     cfg["tm_url"] = ask("  TM address", cfg["tm_url"])
     cfg["tm_api_key"] = ask("  TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"], secret=True)
@@ -229,6 +251,15 @@ async def cmd_setup():
     cfg["obs_password"] = ask("  OBS WebSocket password", cfg["obs_password"], secret=True)
     save(cfg)
 
+    if not cfg["client_id"]:
+        print("No VEX credentials: checking whether your TM accepts requests without them...")
+        mode = probe(cfg)
+        if not mode:
+            raise RuntimeError("TM needs VEX-issued credentials. Request them, then run setup again.")
+        cfg["auth_mode"] = mode
+        save(cfg)
+    else:
+        cfg["auth_mode"] = "dwab"
     tm = TM(cfg)
     sets = tm.get("/api/fieldsets")["fieldSets"]
     print("Field sets in TM:")
@@ -251,6 +282,48 @@ async def cmd_setup():
     print(f"Saved to {CONFIG}. Start switching with: mobius-tm-obs")
 
 
+MODES = (("none", "no sign-in at all"),
+         ("keyonly", "TM API key signature only, no VEX credentials"),
+         ("dwab", "VEX/DWAB token + TM API key signature (the official way)"))
+
+
+def probe(cfg):
+    """Try each sign-in mode against TM's event resource; return the first that TM accepts."""
+    tm = TM(cfg)
+    works = None
+    for mode, label in MODES:
+        if mode == "dwab" and not (cfg["client_id"] and cfg["client_secret"]):
+            print(f"  skip  {label}: no VEX credentials saved")
+            continue
+        try:
+            code, body = tm.status("/api/event", mode)
+        except Exception as e:
+            print(f"  FAIL  {label}: {e}")
+            continue
+        verdict = "WORKS" if code == 200 else f"refused ({code})"
+        print(f"  {verdict:<14} {label}" + (f": {body.strip()[:80]}" if code == 200 else ""))
+        if code in (404, 503):
+            print("         (TM's API is off: Tools > Options > Web Publishing > Enable Local TM API)")
+        works = works or (mode if code == 200 else None)
+    return works
+
+
+def cmd_probe():
+    cfg = load()
+    cfg["tm_url"] = ask("TM address", cfg["tm_url"])
+    cfg["tm_api_key"] = ask("TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"], secret=True)
+    save(cfg)
+    print(f"Asking TM at {cfg['tm_url']}:")
+    mode = probe(cfg)
+    if mode:
+        cfg["auth_mode"] = mode
+        save(cfg)
+        print(f"Saved: mobius-tm-obs will use '{mode}'. Next: mobius-tm-obs setup")
+    else:
+        print("TM accepted none of them. It needs VEX-issued credentials (Client ID + Secret).")
+    return 0 if mode else 1
+
+
 def cmd_key():
     cfg = load()
     cfg["tm_api_key"] = ask("This event's TM API key", "", secret=True) or cfg["tm_api_key"]
@@ -262,7 +335,12 @@ async def cmd_test():
     cfg = load()
     ok = True
     tm = TM(cfg)
-    for name, fn in (("DWAB sign-in", tm.bearer), ("TM API", lambda: tm.get("/api/event")["event"]["name"])):
+    checks = [("TM API", lambda: tm.get("/api/event")["event"]["name"])]
+    if cfg.get("auth_mode", "dwab") == "dwab":
+        checks.insert(0, ("DWAB sign-in", tm.bearer))
+    else:
+        print(f"note  sign-in mode '{cfg['auth_mode']}' (no VEX credentials)")
+    for name, fn in checks:
         try:
             r = fn()
             print(f"ok    {name}" + (f": {r}" if name == "TM API" else ""))
@@ -372,6 +450,8 @@ def main():
             asyncio.run(cmd_setup())
         elif cmd == "key":
             cmd_key()
+        elif cmd == "probe":
+            sys.exit(cmd_probe())
         elif cmd == "test":
             sys.exit(asyncio.run(cmd_test()))
         elif cmd == "run":

@@ -140,6 +140,8 @@ It comes preinstalled for every Firefox profile (`mobius-firefox`, in `/usr/lib/
 4. `mobius-tm-obs setup` (first time: credentials, addresses, field set, a scene per field, optional after-match scene), or `mobius-tm-obs key` at later events.
 5. `mobius-tm-obs test`, then `mobius-tm-obs` to run. The DWAB sign-in needs internet at the venue.
 
+No VEX credentials yet? `mobius-tm-obs probe` asks your TM whether it answers without them (no sign-in, or the TM API key signature alone) and saves whichever works; `setup` runs it automatically when the Client ID is left blank.
+
 Settings live in `~/.config/mobius/tm-obs.json` (mode 600), never in this repo.
 
 ## Private apps
