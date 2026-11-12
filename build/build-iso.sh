@@ -24,7 +24,7 @@ sed -i \
 sed -i 's|^  \["/usr/local/bin/livecd-sound"\]="0:0:755"|&\n  ["/usr/local/bin/mobius-install"]="0:0:755"|' "$prof/profiledef.sh"
 
 # Extra live packages the installer needs
-printf '%s\n' python gptfdisk btrfs-progs dosfstools arch-install-scripts >> "$prof/packages.x86_64"
+printf '%s\n' python gptfdisk btrfs-progs dosfstools arch-install-scripts age >> "$prof/packages.x86_64"
 sort -u -o "$prof/packages.x86_64" "$prof/packages.x86_64"
 
 # Installer, with the release repo URL baked in

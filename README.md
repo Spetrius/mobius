@@ -130,6 +130,19 @@ It comes preinstalled for every Firefox profile (`mobius-firefox`, in `/usr/lib/
 
 **Windows Disguise**: on a site that refuses Linux, click the Windows button in the toolbar. That site (and its subdomains) now sees Windows, the page reloads, and the button shows **WIN**. Click again to turn it off. The list is also under about:addons > Mobius Windows Disguise > Preferences.
 
+## Private apps
+
+Apps you can't publish, like VEX TM, are stored encrypted in the public `private` release. Anyone can download them, but only machines unlocked with your private password can use them. `mobius-private` (in `mobius-settings`, built on `age`):
+
+| Command | Does |
+|---|---|
+| `mobius-private init` | once, ever: makes the key, asks you to choose the private password, uploads the locked key (needs `gh auth login`) |
+| `mobius-private add FILE.flatpak NAME` | encrypts the app on your machine and uploads only the encrypted copy; the same command uploads a new version |
+| `mobius-private unlock` | on another machine: type the password once, the key is kept in `/etc/mobius/private.key` (root only) |
+| `mobius-private status` / `remove NAME` | what is there and installed / take an app off the list |
+
+`mobius-update` installs new and changed private apps on every unlocked machine (and now updates Flatpak apps too). The installer offers to unlock at the end of an install. Keep the password in a password manager: without it, new installs can't get the apps, though unlocked machines keep working.
+
 ## Keys
 
 | Keys | Does |

@@ -377,6 +377,28 @@ setup_snapshots_and_boot() {
     (( DRY )) || arch-chroot "$T" /usr/lib/mobius/boot-guard post || die "kernel verification failed"
 }
 
+unlock_private_apps() {
+    # Your private apps (mobius-private): if the release has a locked key, offer to unlock it here,
+    # so the new system installs them right away and keeps them updated. Skipped when unattended.
+    local url="${INSTALL_REPO_URL%/repo}/private" a try
+    (( DRY )) && return
+    [[ -z "${MOBIUS_TEST:-}" && -t 0 ]] || return 0
+    curl -fsSL --retry 3 -o /tmp/master.age "$url/master.age" 2>/dev/null || return 0
+    read -r -p "Unlock your private apps (VEX TM etc.) with your private password? [Y/n] " a
+    [[ "${a:-y}" =~ ^[Yy]$ ]] || { say "Skipped. Later, run: mobius-private unlock"; return 0; }
+    for try in 1 2 3; do
+        if age -d -o /tmp/private.key /tmp/master.age; then
+            install -Dm600 /tmp/private.key "$T/etc/mobius/private.key"
+            shred -u /tmp/private.key 2>/dev/null || rm -f /tmp/private.key
+            ok "Private apps unlocked"
+            arch-chroot "$T" mobius-private sync || say "Private apps will install with your first mobius-update"
+            return 0
+        fi
+        echo "Wrong password, try again ($try of 3)."
+    done
+    say "Not unlocked. Later, run: mobius-private unlock"
+}
+
 copy_install_log() {
     (( DRY )) && return
     mkdir -p "$T/var/log/mobius"
@@ -406,6 +428,7 @@ main() {
     install_packages
     configure_system
     setup_snapshots_and_boot
+    unlock_private_apps
     copy_install_log
     run umount -R "$T"
     echo
