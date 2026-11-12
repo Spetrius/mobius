@@ -64,6 +64,8 @@ def load():
     if os.path.exists(CONFIG):
         with open(CONFIG) as f:
             cfg.update(json.load(f))
+    cfg["tm_url"] = norm_url(cfg["tm_url"], "http")
+    cfg["obs_url"] = norm_url(cfg["obs_url"], "ws")
     return cfg
 
 
@@ -73,6 +75,12 @@ def save(cfg):
     with os.fdopen(fd, "w") as f:
         json.dump(cfg, f, indent=2)
     os.replace(CONFIG + ".new", CONFIG)
+
+
+def norm_url(url, scheme):
+    """Accept '10.8.43.37' or 'spetlin:8080' as well as full URLs."""
+    url = url.strip().rstrip("/")
+    return url if "://" in url else f"{scheme}://{url}"
 
 
 def ask(prompt, current="", secret=False):
@@ -244,18 +252,19 @@ async def cmd_setup():
     if cfg["client_id"]:
         cfg["client_secret"] = ask("  Client secret", cfg["client_secret"], secret=True)
     print("Tournament Manager (the TM server's address; this PC if TM runs here):")
-    cfg["tm_url"] = ask("  TM address", cfg["tm_url"])
+    cfg["tm_url"] = norm_url(ask("  TM address", cfg["tm_url"]), "http")
     cfg["tm_api_key"] = ask("  TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"], secret=True)
     print("OBS (Tools > WebSocket Server Settings):")
-    cfg["obs_url"] = ask("  OBS WebSocket address", cfg["obs_url"])
+    cfg["obs_url"] = norm_url(ask("  OBS WebSocket address", cfg["obs_url"]), "ws")
     cfg["obs_password"] = ask("  OBS WebSocket password", cfg["obs_password"], secret=True)
     save(cfg)
 
     if not cfg["client_id"]:
         print("No VEX credentials: checking whether your TM accepts requests without them...")
-        mode = probe(cfg)
+        mode, answered = probe(cfg)
         if not mode:
-            raise RuntimeError("TM needs VEX-issued credentials. Request them, then run setup again.")
+            raise RuntimeError("TM needs VEX-issued credentials. Request them, then run setup again."
+                               if answered else "could not reach TM; check the address and try again")
         cfg["auth_mode"] = mode
         save(cfg)
     else:
@@ -290,36 +299,44 @@ MODES = (("none", "no sign-in at all"),
 def probe(cfg):
     """Try each sign-in mode against TM's event resource; return the first that TM accepts."""
     tm = TM(cfg)
-    works = None
+    works, answered = None, False
     for mode, label in MODES:
         if mode == "dwab" and not (cfg["client_id"] and cfg["client_secret"]):
             print(f"  skip  {label}: no VEX credentials saved")
             continue
         try:
             code, body = tm.status("/api/event", mode)
+        except urllib.error.URLError as e:
+            print(f"  FAIL  {label}: cannot reach TM ({e.reason})")
+            continue
         except Exception as e:
             print(f"  FAIL  {label}: {e}")
             continue
+        answered = True
         verdict = "WORKS" if code == 200 else f"refused ({code})"
         print(f"  {verdict:<14} {label}" + (f": {body.strip()[:80]}" if code == 200 else ""))
         if code in (404, 503):
             print("         (TM's API is off: Tools > Options > Web Publishing > Enable Local TM API)")
         works = works or (mode if code == 200 else None)
-    return works
+    if not answered:
+        print("TM never answered: check the address (is TM running, Local TM API on, port 80 or 8080?).")
+    return works, answered
 
 
 def cmd_probe():
     cfg = load()
-    cfg["tm_url"] = ask("TM address", cfg["tm_url"])
+    cfg["tm_url"] = norm_url(ask("TM address", cfg["tm_url"]), "http")
     cfg["tm_api_key"] = ask("TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"], secret=True)
     save(cfg)
+    if not cfg["tm_api_key"]:
+        print("Note: no TM API key given, so only 'no sign-in at all' can work.")
     print(f"Asking TM at {cfg['tm_url']}:")
-    mode = probe(cfg)
+    mode, answered = probe(cfg)
     if mode:
         cfg["auth_mode"] = mode
         save(cfg)
         print(f"Saved: mobius-tm-obs will use '{mode}'. Next: mobius-tm-obs setup")
-    else:
+    elif answered:
         print("TM accepted none of them. It needs VEX-issued credentials (Client ID + Secret).")
     return 0 if mode else 1
 

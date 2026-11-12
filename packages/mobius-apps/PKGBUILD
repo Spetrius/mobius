@@ -1,7 +1,7 @@
 # Everyday apps on top of the desktop: phone link, sync, photography, study.
 pkgname=mobius-apps
 pkgver=2026.10.28
-pkgrel=9
+pkgrel=10
 pkgdesc='Mobius Linux apps: KDE Connect, Syncthing, backups, OBS, photography, study tools, LM Studio, Bambu Studio'
 arch=('any')
 license=('MIT')
