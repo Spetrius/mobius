@@ -125,7 +125,25 @@ while read -r name commit; do
     build_dir "$d"
 done < "$root/packages/aur.list"
 
-for p in "${MOBIUS_LOCAL_PKGS[@]}"; do build_dir "$work/$p"; done
+# Temporary overrides of Arch packages (PKGBUILD line _mobius_override=repo/name=version): built only
+# while Arch still ships exactly that version. Once Arch moves on, ours is dropped from the database,
+# so the newer Arch package wins instead of being shadowed by [mobius], which comes first.
+override_retired() {  # $1 = dir with PKGBUILD
+    local spec name want have
+    spec="$(sed -n 's/^_mobius_override=//p' "$1/PKGBUILD")"
+    [[ -n "$spec" ]] || return 1
+    name="${spec%=*}"; want="${spec##*=}"
+    have="$(pacman -Si "$name" 2>/dev/null | sed -n 's/^Version *: //p' | head -1)"
+    [[ -n "$have" && "$have" != "$want" ]] || return 1
+    echo "== $(basename "$1"): Arch now ships $name $have (override was for $want): retired"
+    repo-remove -q "$out/mobius.db.tar.zst" "${name#*/}" 2>/dev/null || true
+    return 0
+}
+
+for p in "${MOBIUS_LOCAL_PKGS[@]}"; do
+    override_retired "$work/$p" && continue
+    build_dir "$work/$p"
+done
 
 # Signing. With the key: every package without a signature gets one, and the database files are
 # re-signed (they change every run). Without it, nothing is signed (the repo stays unsigned).

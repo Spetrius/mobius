@@ -1,0 +1,115 @@
+# TEMPORARY OVERRIDE of Arch's waybar 0.16.0-1, from Arch's own PKGBUILD (gitlab.archlinux.org
+# archlinux/packaging/packages/waybar @ 59083ba) plus one patch.
+# Waybar 0.16.0 added a dbusmenu size check (upstream commit e3416cf8) that rejects the tray menus of
+# Proton VPN, KDE Connect and Claude as "malformed or more than 1000 entries", so their tray icons
+# ignore every click (https://github.com/Alexays/Waybar/issues/5477). The patch reverts that check.
+# build-repo.sh retires this package by itself as soon as Arch's waybar is no longer 0.16.0-1, so a
+# fixed upstream release is never shadowed by this copy ([mobius] is listed before [extra]).
+_mobius_override=extra/waybar=0.16.0-1
+# Maintainer: Brett Cornwall <ainola@archlinux.org>
+# Maintainer: Robin Candau <antiz@archlinux.org>
+# Contributor: Maxim Baz <archlinux at maximbaz dot com>
+# Contributor: Parmjot Singh <parmjotsinghrobot at gmail dot com>
+
+pkgname=waybar
+pkgver=0.16.0
+pkgrel=1.1
+pkgdesc='Highly customizable Wayland bar for Sway and Wlroots based compositors'
+arch=('x86_64')
+url="https://github.com/Alexays/Waybar/"
+license=('MIT')
+depends=(
+    'atkmm'
+    'cairomm'
+    'fmt'
+    'glib2'
+    'glibc'
+    'glibmm'
+    'gpsd'
+    'gtk-layer-shell'
+    'gtk3'
+    'gtkmm3'
+    'jack'
+    'jsoncpp'
+    'libdbusmenu-gtk3'
+    'libevdev'
+    'libgcc'
+    'libinput'
+    'libmm-glib'
+    'libmpdclient'
+    'libnl'
+    'libpipewire'
+    'libpulse'
+    'libsigc++'
+    'libstdc++'
+    'libwireplumber'
+    'libxkbcommon'
+    'playerctl'
+    'sndio'
+    'spdlog'
+    'systemd-libs'
+    'upower'
+    'wayland'
+)
+makedepends=(
+    'catch2'
+    'cmake'
+    'meson'
+    'glib2-devel' # gdbus-codegen
+    'scdoc' # For generating manpages
+    'wayland-protocols'
+)
+backup=(
+    etc/xdg/waybar/config.jsonc
+    etc/xdg/waybar/style.css
+)
+optdepends=(
+    'otf-font-awesome: Icons in the default configuration'
+)
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Alexays/Waybar/archive/$pkgver.tar.gz"
+        "tray-menu-limit-revert.patch")
+b2sums=('8cb2e1fc35219fa507b5d16d9576e5633f1ba5087196dd93868cefd8f07b37865563dbc7bb4116f7a2da326f310381f0b2e735a983f9981df41c59cd32871087'
+        '26803fa005415e1da425201193248d60a1bfd27a3f229efa0009b247f0da76d5ff26034539ab970a1c2a84aa6aadc8d7fc8e928fbde5a8ef377ee76dcbd35589')
+
+prepare() {
+    cd "Waybar-$pkgver"
+    patch -Np1 -i "$srcdir/tray-menu-limit-revert.patch"
+}
+
+build() {
+    cd "Waybar-$pkgver"
+    meson --prefix=/usr \
+          --buildtype=plain \
+          --auto-features=enabled \
+          --wrap-mode=nodownload \
+          -Dcpp_std=c++20 \
+          -Dexperimental=true \
+          -Dcava=disabled \
+          -Dtests=enabled \
+          build
+    meson compile -C build
+}
+
+check() {
+    cd "Waybar-$pkgver"
+    meson test -C build --print-errorlogs --no-rebuild --suite waybar
+}
+
+package() {
+    depends+=(
+      'libatkmm-1.6.so'
+      'libcairomm-1.0.so'
+      'libgtk-3.so'
+      'libjack.so'
+      'libjsoncpp.so'
+      'libpipewire-0.3.so'
+      'libsndio.so'
+      'libspdlog.so'
+      'libudev.so'
+      'libupower-glib.so'
+    )
+
+    cd "Waybar-$pkgver"
+    meson install -C build --destdir "$pkgdir"
+    install -Dm644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname/"
+}

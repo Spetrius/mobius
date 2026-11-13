@@ -28,6 +28,7 @@ Personal Arch-based distro for `spetlin` (Ryzen 7 5800X3D, RX 9060 XT 16GB RDNA4
 ## Layout
 - `packages/<name>/PKGBUILD` (+ `files/` tree copied verbatim into the package)
 - `packages/aur.list`: AUR packages rebuilt into our repo, `name commit`, in dependency order
+- Temporary overrides of Arch packages (e.g. `packages/waybar`): Arch's PKGBUILD + patch, pkgrel `N.1`, and a `_mobius_override=extra/<name>=<arch version>` line; `build-repo.sh` drops ours from the db once Arch ships any other version, because [mobius] is listed first and would otherwise shadow the fix
 - `packages/aur-fixes/<name>.sh`: our fix for a broken AUR package, appended to its PKGBUILD by `build-repo.sh` (pkgrel gets `.1`). Wrap upstream functions (`eval "_upstream_$(declare -f package)"`) rather than patch lines, so weekly bumps keep applying
 - `build/config.sh`: GitHub owner/repo, package build order
 - `build/build-repo.sh`: builds everything into `out/repo`, skips packages whose exact version already exists. `SKIP_PKGS=`, `KEEP_GOING=1`.
