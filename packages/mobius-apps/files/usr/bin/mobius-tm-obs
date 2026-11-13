@@ -5,7 +5,7 @@ Built from the TM Public API Guide v1.2. It only switches your OBS scenes: it ne
 replaces, covers or imitates TM's own displays, timers or branding (the API's usage rules).
 
   mobius-tm-obs setup     credentials, TM and OBS addresses, field set, field -> scene map
-  mobius-tm-obs key       paste this event's TM API key (TM makes a new one every event)
+  mobius-tm-obs key [KEY] paste this event's TM API key (TM makes a new one every event)
   mobius-tm-obs test      check DWAB sign-in, TM and OBS without switching anything
   mobius-tm-obs probe     ask your TM how it wants to be signed in to (with or without VEX credentials)
   mobius-tm-obs           run: switch scenes as TM queues, activates, starts and stops matches
@@ -81,6 +81,19 @@ def norm_url(url, scheme):
     """Accept '10.8.43.37' or 'spetlin:8080' as well as full URLs."""
     url = url.strip().rstrip("/")
     return url if "://" in url else f"{scheme}://{url}"
+
+
+def show_key(key):
+    """Confirm a pasted key without printing all of it: first/last 4 characters and the length."""
+    return f"{key[:4]}...{key[-4:]} ({len(key)} characters)" if len(key) > 8 else f"({len(key)} characters)"
+
+
+def ask_key(prompt, current):
+    """The TM API key changes every event and only works on the venue LAN, so it is shown while typed."""
+    val = input(f"{prompt}{' [' + show_key(current) + ', Enter keeps it]' if current else ''}: ").strip() or current
+    if val:
+        print(f"  key: {show_key(val)}")
+    return val
 
 
 def ask(prompt, current="", secret=False):
@@ -253,7 +266,7 @@ async def cmd_setup():
         cfg["client_secret"] = ask("  Client secret", cfg["client_secret"], secret=True)
     print("Tournament Manager (the TM server's address; this PC if TM runs here):")
     cfg["tm_url"] = norm_url(ask("  TM address", cfg["tm_url"]), "http")
-    cfg["tm_api_key"] = ask("  TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"], secret=True)
+    cfg["tm_api_key"] = ask_key("  TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"])
     print("OBS (Tools > WebSocket Server Settings):")
     cfg["obs_url"] = norm_url(ask("  OBS WebSocket address", cfg["obs_url"]), "ws")
     cfg["obs_password"] = ask("  OBS WebSocket password", cfg["obs_password"], secret=True)
@@ -326,7 +339,7 @@ def probe(cfg):
 def cmd_probe():
     cfg = load()
     cfg["tm_url"] = norm_url(ask("TM address", cfg["tm_url"]), "http")
-    cfg["tm_api_key"] = ask("TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"], secret=True)
+    cfg["tm_api_key"] = ask_key("TM API key (Tools > Options > Web Publishing)", cfg["tm_api_key"])
     save(cfg)
     if not cfg["tm_api_key"]:
         print("Note: no TM API key given, so only 'no sign-in at all' can work.")
@@ -343,9 +356,10 @@ def cmd_probe():
 
 def cmd_key():
     cfg = load()
-    cfg["tm_api_key"] = ask("This event's TM API key", "", secret=True) or cfg["tm_api_key"]
+    given = sys.argv[2].strip() if len(sys.argv) > 2 else ""
+    cfg["tm_api_key"] = given or ask_key("This event's TM API key", cfg["tm_api_key"])
     save(cfg)
-    print("Saved.")
+    print(f"Saved TM API key {show_key(cfg['tm_api_key'])}.")
 
 
 async def cmd_test():
