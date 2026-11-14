@@ -8,6 +8,7 @@ Driver-period length for the 5-second countdown: TM_DRIVER_SECONDS (default 60, 
 Driver-switch signals (VIQ teamwork), seconds after the driver period starts: TM_SWITCH_SECONDS
 (default "25,35": Warning.wav at the first, Warning2.wav at the second; "" turns them off).
 TM's log has no line for the switch, so these are timed from the match start.
+The first switch sound plays twice back to back (TM_WARNING_REPEAT, default 2).
 Fields to ignore (e.g. the skills field): TM_SKIP_FIELDS="name,name" as printed at match start.
 
   tm-sounds          watch TM's log files and play sounds; TM can already be open (default)
@@ -18,7 +19,7 @@ Fields to ignore (e.g. the skills field): TM_SKIP_FIELDS="name,name" as printed 
 Log folder: TM_LOG_DIR (default ~/.VEX Tournament Manager/Logs). Text logs are followed like
 tail -f; a log that is really a SQLite database is polled for new rows.
 """
-import os, re, sqlite3, subprocess, sys, threading, time
+import os, re, sqlite3, subprocess, sys, threading, time, wave
 
 APP = "com.dwabtech.TM"
 SOUNDS = os.environ.get("TM_SOUNDS_DIR", f"/var/lib/flatpak/app/{APP}/current/active/files/Sounds")
@@ -43,11 +44,11 @@ SINK = pick_sink()
 last = {}
 SWITCH_ONLY = "--switch-only" in sys.argv or os.environ.get("TM_SWITCH_ONLY") == "1"
 
-def play(name):
+def play(name, force=False):
     if SWITCH_ONLY and name not in ("Warning", "Warning2"):
         return
     now = time.monotonic()
-    if now - last.get(name, 0) < 1.5:      # TM logs each event twice (two log formats)
+    if not force and now - last.get(name, 0) < 1.5:   # TM logs each event twice (two log formats)
         return
     last[name] = now
     path = os.path.join(SOUNDS, name + ".wav")
@@ -68,8 +69,18 @@ def cancel_countdown(field=None):
         for t in timers.pop(f, []):
             t.cancel()
 
-def after(field, seconds, sound):
-    t = threading.Timer(seconds, play, args=(sound,))
+def length(name):
+    try:
+        with wave.open(os.path.join(SOUNDS, name + ".wav")) as w:
+            return w.getnframes() / w.getframerate()
+    except Exception:
+        return 1.0
+
+# How many times the first driver-switch sound plays back to back (TM_WARNING_REPEAT, default 2)
+REPEAT = max(1, int(os.environ.get("TM_WARNING_REPEAT", "2")))
+
+def after(field, seconds, sound, force=False):
+    t = threading.Timer(seconds, play, args=(sound, force))
     t.daemon = True
     t.start()
     timers.setdefault(field, []).append(t)
@@ -79,7 +90,12 @@ def arm_countdown(field):
     cancel_countdown(field)
     for i, sec in enumerate(SWITCH):
         if 0 < sec < DRIVER:
-            after(field, sec, "Warning" if i == 0 else "Warning2")
+            if i == 0:
+                gap = length("Warning")
+                for n in range(REPEAT):
+                    after(field, sec + n * gap, "Warning", force=n > 0)
+            else:
+                after(field, sec, "Warning2")
     if DRIVER > 5:
         after(field, DRIVER - 5, "FiveSecondCountdown")
 
