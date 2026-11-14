@@ -9,10 +9,13 @@ Driver-switch signals (VIQ teamwork), seconds after the driver period starts: TM
 (default "25,35": Warning.wav at the first, Warning2.wav at the second; "" turns them off).
 TM's log has no line for the switch, so these are timed from the match start.
 
-  tm-sounds          start TM with sounds
+  tm-sounds          watch TM's log files and play sounds; TM can already be open (default)
+  tm-sounds --launch start TM and read its output instead
   tm-sounds --test   play the start sound once, to check the speaker
+Log folder: TM_LOG_DIR (default ~/.VEX Tournament Manager/Logs). Text logs are followed like
+tail -f; a log that is really a SQLite database is polled for new rows.
 """
-import os, re, subprocess, sys, threading, time
+import os, re, sqlite3, subprocess, sys, threading, time
 
 APP = "com.dwabtech.TM"
 SOUNDS = os.environ.get("TM_SOUNDS_DIR", f"/var/lib/flatpak/app/{APP}/current/active/files/Sounds")
@@ -103,10 +106,97 @@ def handle(line):
                 play("Stop")
         return
 
+LOG_DIR = os.environ.get("TM_LOG_DIR", os.path.expanduser("~/.VEX Tournament Manager/Logs"))
+
+class TextLog:
+    def __init__(self, path):
+        self.path, self.f, self.ino, self.buf = path, None, None, ""
+        self.open(at_end=True)
+    def open(self, at_end):
+        try:
+            f = open(self.path, "r", errors="replace")
+        except OSError:
+            return
+        if self.f: self.f.close()
+        self.f, self.ino, self.buf = f, os.fstat(f.fileno()).st_ino, ""
+        if at_end: f.seek(0, 2)
+    def poll(self):
+        try:
+            st = os.stat(self.path)
+        except OSError:
+            return []
+        if self.f is None or st.st_ino != self.ino or st.st_size < self.f.tell():
+            self.open(at_end=self.f is None)        # rotated or truncated: read the new file from the top
+            if self.f is None: return []
+        self.buf += self.f.read()
+        *lines, self.buf = self.buf.split("\n")
+        return lines
+
+class SqliteLog:
+    def __init__(self, path):
+        self.path, self.last = path, {}
+        for t in self.tables():
+            self.last[t] = self.maxrow(t)
+    def db(self):
+        return sqlite3.connect(f"file:{self.path}?mode=ro", uri=True, timeout=0.5)
+    def tables(self):
+        try:
+            with self.db() as c:
+                return [r[0] for r in c.execute("select name from sqlite_master where type='table'")]
+        except sqlite3.Error:
+            return list(self.last)
+    def maxrow(self, t):
+        try:
+            with self.db() as c:
+                return c.execute(f'select coalesce(max(rowid),0) from "{t}"').fetchone()[0]
+        except sqlite3.Error:
+            return 0
+    def poll(self):
+        out = []
+        try:
+            c = self.db()
+            for t in self.tables():
+                start = self.last.setdefault(t, 0)
+                for row in c.execute(f'select rowid, * from "{t}" where rowid > ? order by rowid', (start,)):
+                    self.last[t] = row[0]
+                    out.append(" ".join(str(v) for v in row[1:] if isinstance(v, (str, int, float))))
+            c.close()
+        except sqlite3.Error:
+            pass                                    # TM is writing; try again next round
+        return out
+
+def is_sqlite(path):
+    try:
+        with open(path, "rb") as f:
+            return f.read(16) == b"SQLite format 3\x00"
+    except OSError:
+        return False
+
+def watch():
+    if not os.path.isdir(LOG_DIR):
+        sys.exit(f"tm-sounds: no TM log folder at {LOG_DIR} (start TM once, or set TM_LOG_DIR)")
+    logs = {}
+    print(f"tm-sounds: speaker = {SINK or 'default output'}; watching {LOG_DIR}", flush=True)
+    while True:
+        for name in os.listdir(LOG_DIR):
+            path = os.path.join(LOG_DIR, name)
+            if path in logs or not re.fullmatch(r"[^.].*\.log", name) or not os.path.isfile(path):
+                continue                            # skip rotated copies (.log.1) and the -journal
+            logs[path] = SqliteLog(path) if is_sqlite(path) else TextLog(path)
+        for log in logs.values():
+            for line in log.poll():
+                handle(line)
+        time.sleep(0.2)
+
 def main():
     if "--test" in sys.argv:
         print(f"tm-sounds: speaker = {SINK or 'default output'}")
         play("Start"); time.sleep(3); return
+    if "--launch" not in sys.argv and not TM_CMD:
+        try:
+            watch()
+        except KeyboardInterrupt:
+            return
     cmd = TM_CMD.split() if TM_CMD else ["flatpak", "run", "--env=PYTHONUNBUFFERED=1", "--command=sh", APP, "-c", "cd /app; exec ./TM"]
     print(f"tm-sounds: speaker = {SINK or 'default output'}; starting TM", flush=True)
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, errors="replace")
