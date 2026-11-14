@@ -80,6 +80,10 @@ The installer refuses to touch any disk holding GAMES, DATA1, DATA2, External HD
 
 It also checks the hardware and adds what that machine needs: Intel microcode, thermald and Intel GPU drivers on an Intel CPU, and `mobius-nvidia` on an NVIDIA GPU. The AMD desktop gets nothing extra.
 
+### Lab PCs (i7-8700, Quadro P2000)
+
+The installer recognises the card by its PCI ID and installs `mobius-nvidia-legacy`: NVIDIA's 580 legacy driver, the last one that supports Pascal cards like the P2000 (the current driver and the open modules dropped them). Plug the screens into the P2000, not the motherboard. After the first boot, `mobius-gpu-check` confirms the driver, modesetting and which card drives each screen.
+
 ### Laptop (Legion 5i, hybrid graphics)
 - Leave the BIOS GPU mode on **Hybrid** (or Auto). The Intel GPU draws the desktop and the RTX 4060 powers off when idle, which is what gives decent battery life.
 - Games: Vulkan/DXVK/Proton games normally pick the RTX 4060 by themselves. If one runs on the Intel GPU, set its Steam launch option to `prime-run %command%`.

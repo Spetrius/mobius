@@ -8,3 +8,5 @@ limine-snapper-sync b3c82aded52032687a76922f2dee9497600818f2
 lmstudio-bin 1df25f8d4b466eca3bd1d6a94bed9f07fb70ecea
 bambustudio-bin 22976fb9566b6766e47f2456c248929a89f07851
 minecraft-launcher c6cac125f8cfc5d9a45e93b7f3ac9b01385dae23
+nvidia-580xx-utils 0b45a07013d6cc1d19dbf61c110f9b97d6fc429b
+lib32-nvidia-580xx-utils 489271acfd01c91bc07201300e6b63f3d2a8e2ba

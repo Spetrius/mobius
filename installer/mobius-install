@@ -114,20 +114,32 @@ preflight() {
 # ---------------------------------------------------------------- disks
 detect_hardware() {
     # spetlin (AMD CPU + Radeon) needs nothing extra. Intel CPUs get microcode, thermald and the
-    # Intel GPU drivers (the iGPU draws the desktop on hybrid laptops); NVIDIA gets mobius-nvidia.
-    local d nvidia=0 what=()
+    # Intel GPU drivers (the iGPU draws the desktop on hybrid laptops); NVIDIA gets mobius-nvidia
+    # (RTX 20+) or mobius-nvidia-legacy (GTX 900/1000, Quadro M/P such as the lab PCs' P2000).
+    local d nvidia=0 nvdev=0 what=()
     if grep -q GenuineIntel /proc/cpuinfo; then
         HW_PKGS+=(intel-ucode thermald vulkan-intel lib32-vulkan-intel intel-media-driver)
         HW_SERVICES+=(thermald)
         what+=("Intel CPU/GPU")
     fi
     for d in /sys/bus/pci/devices/*; do
-        if [[ "$(<"$d/class")" == 0x03* && "$(<"$d/vendor")" == 0x10de ]]; then nvidia=1; fi
+        if [[ "$(<"$d/class")" == 0x03* && "$(<"$d/vendor")" == 0x10de ]]; then
+            nvidia=1; nvdev=$(( $(<"$d/device") ))
+        fi
     done
-    if (( nvidia )); then
+    # By PCI device ID: Turing (RTX 20) and newer start at 0x1e00 and use the open driver;
+    # Maxwell, Pascal and Volta (0x1340-0x1dff: GTX 900/1000, Quadro M/P) need the 580 legacy
+    # branch; anything older has no supported proprietary driver and stays on nouveau.
+    if (( nvidia && nvdev >= 0x1e00 )); then
         HW_PKGS+=(mobius-nvidia)
         HW_SERVICES+=(nvidia-suspend nvidia-resume nvidia-hibernate)
-        what+=("NVIDIA GPU")
+        what+=("NVIDIA GPU (open driver)")
+    elif (( nvidia && nvdev >= 0x1340 )); then
+        HW_PKGS+=(mobius-nvidia-legacy)
+        HW_SERVICES+=(nvidia-suspend nvidia-resume nvidia-hibernate)
+        what+=("NVIDIA GPU (580 legacy driver)")
+    elif (( nvidia )); then
+        what+=("NVIDIA GPU too old for the NVIDIA driver (nouveau)")
     fi
     if compgen -G "/sys/class/power_supply/BAT*" >/dev/null; then
         HW_SERVICES+=(mobius-battery)   # reapplies the charge limit chosen with mobius-battery (off until then)

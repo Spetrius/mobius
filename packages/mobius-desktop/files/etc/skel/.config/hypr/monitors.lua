@@ -56,8 +56,9 @@ end
 
 local current
 local function apply()
-    local name = forced_profile() or detect() or current or "home"
-    if name == current then return end
+    -- Monitors that match no profile (e.g. the lab PCs) keep the catch-all rule below
+    local name = forced_profile() or detect() or current
+    if not name or name == current then return end
     current = name
     for _, spec in ipairs(profiles[name]) do hl.monitor(spec) end
 end
