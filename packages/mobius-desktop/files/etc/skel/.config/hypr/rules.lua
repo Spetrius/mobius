@@ -1,4 +1,4 @@
--- Window rules. Workspace 1 = main screen (DP-2), workspace 2 = side screen (HDMI-A-1).
+-- Window rules. Workspace 1 = main screen, workspace 2 = side screen (see monitors.lua).
 local main, side = 1, 2
 
 hl.window_rule({ name = "suppress-maximize", match = { class = ".*" }, suppress_event = "maximize" })

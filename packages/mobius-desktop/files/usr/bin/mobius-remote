@@ -43,9 +43,13 @@ serve() {   # run from Hyprland autostart; does nothing unless 'host on' was cho
     while :; do
         ip="$(ts_ip)"
         if [[ -z "$ip" ]]; then sleep 10; continue; fi             # Tailscale not up yet
-        out="$(hyprctl monitors -j 2>/dev/null | python3 -c 'import json,sys
+        # The main screen: the one showing workspace 1 (whichever port it is on), else the first
+        out="$(hyprctl workspaces -j 2>/dev/null | python3 -c 'import json,sys
+w=[x.get("monitor","") for x in json.load(sys.stdin) if x.get("id")==1]
+print(w[0] if w else "")' 2>/dev/null || true)"
+        [[ -n "$out" ]] || out="$(hyprctl monitors -j 2>/dev/null | python3 -c 'import json,sys
 m=[x["name"] for x in json.load(sys.stdin)]
-print("DP-2" if "DP-2" in m else (m[0] if m else ""))' 2>/dev/null || true)"
+print(m[0] if m else "")' 2>/dev/null || true)"
         # -r: draw the mouse pointer into the picture (viewers don't get it otherwise)
         wayvnc -r -C "$vnc/config" ${out:+-o "$out"} "$ip" "$PORT" || true
         [[ -f "$flag" ]] || exit 0                                  # turned off: stop

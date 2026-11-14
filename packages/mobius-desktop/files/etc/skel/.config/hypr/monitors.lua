@@ -1,26 +1,29 @@
 -- Two desks and a laptop, one config. The profile is picked from the monitors that are plugged in.
 -- Force one with: mobius-monitors home | dad | laptop | auto   (writes ~/.config/hypr/monitor-profile)
--- Workspace 1 always lives on the main screen (DP-2), workspace 2 on the side screen (HDMI-A-1).
+-- Monitors are recognised by their EDID name, not by the port they are plugged into, so moving a
+-- cable to another port changes nothing. Workspace 1 lives on the main screen, workspace 2 on the
+-- side screen. Any other screen at a desk (a TV, a projector) goes far right as workspace 10.
 
 local profiles = {
     home = {
         -- HP OMEN, left
-        { output = "HDMI-A-1", mode = "2560x1440@75",  position = "0x0",    scale = 1 },
+        { match = "OMEN", mode = "2560x1440@75",  position = "0x0",    scale = 1, workspace = "2" },
         -- Acer ultrawide, right, main
-        { output = "DP-2",     mode = "3440x1440@144", position = "2560x0", scale = 1 },
+        { match = "ACER", mode = "3440x1440@144", position = "2560x0", scale = 1, workspace = "1" },
     },
     dad = {
         -- MSI G273, left, main
-        { output = "DP-2",     mode = "preferred", position = "0x0",    scale = 1 },
+        { match = "MSI",       mode = "preferred", position = "0x0",    scale = 1, workspace = "1" },
         -- LG ULTRAGEAR, right
-        { output = "HDMI-A-1", mode = "preferred", position = "1920x0", scale = 1 },
+        { match = "ULTRAGEAR", mode = "preferred", position = "1920x0", scale = 1, workspace = "2" },
     },
     laptop = {
         -- Legion 5i built-in 16" 2560x1600 165 Hz (eDP-2 when the BIOS MUX is set to dGPU)
-        { output = "eDP-1", mode = "2560x1600@165", position = "0x0", scale = 1.25 },
-        { output = "eDP-2", mode = "2560x1600@165", position = "0x0", scale = 1.25 },
+        { port = "^eDP", mode = "2560x1600@165", position = "0x0", scale = 1.25, workspace = "1" },
     },
 }
+-- Screens at a desk that match nothing above
+local extra = { mode = "preferred", position = "auto-right", scale = 1, workspace = "10" }
 
 -- Substrings of the EDID description (hyprctl monitors shows it as "description")
 local signatures = {
@@ -37,9 +40,13 @@ local function forced_profile()
     return nil
 end
 
-local function detect()
+local function monitors()
     local ok, mons = pcall(hl.get_monitors)
-    if not ok or not mons then return nil end
+    if ok and mons then return mons end
+    return {}
+end
+
+local function detect(mons)
     local laptop = false
     for _, m in ipairs(mons) do
         if (m.name or ""):find("^eDP") then laptop = true end
@@ -54,13 +61,43 @@ local function detect()
     return laptop and "laptop" or nil
 end
 
-local current
+-- The profile entry for one connected monitor: by EDID name, or by port for the laptop panel
+local function entry_for(profile, m)
+    local d, port = (m.description or ""):upper(), m.name or ""
+    for _, spec in ipairs(profile) do
+        if (spec.match and d:find(spec.match, 1, true)) or (spec.port and port:find(spec.port)) then
+            return spec
+        end
+    end
+    return nil
+end
+
+local placed = {}   -- port -> "mode position workspace" last applied, so re-runs add nothing new
+local function place(port, spec)
+    local key = spec.mode .. " " .. spec.position .. " " .. spec.workspace
+    if placed[port] == key then return end
+    placed[port] = key
+    hl.monitor({ output = port, mode = spec.mode, position = spec.position, scale = spec.scale })
+    hl.workspace_rule({ workspace = spec.workspace, monitor = port, default = true,
+                        persistent = spec.workspace ~= extra.workspace })
+end
+
 local function apply()
+    local mons = monitors()
+    local name = forced_profile() or detect(mons)
     -- Monitors that match no profile (e.g. the lab PCs) keep the catch-all rule below
-    local name = forced_profile() or detect() or current
-    if not name or name == current then return end
-    current = name
-    for _, spec in ipairs(profiles[name]) do hl.monitor(spec) end
+    if not name then return end
+    for _, m in ipairs(mons) do
+        local port = m.name or ""
+        if port ~= "" then
+            local spec = entry_for(profiles[name], m)
+            if spec then
+                place(port, spec)
+            elseif not port:find("^eDP") then
+                place(port, extra)
+            end
+        end
+    end
 end
 
 -- Anything unknown (a TV, a projector) still lights up
@@ -73,22 +110,19 @@ hl.on("hyprland.start", apply)
 -- (logind doesn't suspend while docked); opening it turns the screen back on. With no external
 -- monitor, closing the lid suspends as usual.
 local function lid(closed)
-    local ok, mons = pcall(hl.get_monitors)
-    if not ok or not mons then return end
+    local mons = monitors()
     local external = false
     for _, m in ipairs(mons) do
         if not (m.name or ""):find("^eDP") then external = true end
     end
-    for _, spec in ipairs(profiles.laptop) do
+    local spec = profiles.laptop[1]
+    for _, port in ipairs({ "eDP-1", "eDP-2" }) do
         if not closed then
-            hl.monitor(spec)
+            hl.monitor({ output = port, mode = spec.mode, position = spec.position, scale = spec.scale })
         elseif external then
-            hl.monitor({ output = spec.output, disabled = true })
+            hl.monitor({ output = port, disabled = true })
         end
     end
 end
 hl.bind("switch:on:Lid Switch",  function() lid(true) end,  { locked = true })
 hl.bind("switch:off:Lid Switch", function() lid(false) end, { locked = true })
-
-hl.workspace_rule({ workspace = "1", monitor = "DP-2",     default = true, persistent = true })
-hl.workspace_rule({ workspace = "2", monitor = "HDMI-A-1", default = true, persistent = true })
