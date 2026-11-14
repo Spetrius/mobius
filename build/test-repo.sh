@@ -4,6 +4,7 @@
 #   1. every Mobius meta package resolves against Arch + our repo (catches renamed/dropped deps)
 #   2. the default Hyprland config in mobius-desktop passes Hyprland --verify-config
 #   3. the Waybar config parses, and every shell script in our packages passes bash -n
+#   4. both NVIDIA drivers (open, and 580 legacy) build with DKMS against linux-mobius-headers
 set -euo pipefail
 # Argument: a local repo directory, or a URL (to test the published repo)
 src="${1:-out/repo}"
@@ -28,7 +29,7 @@ pacman -Syu --noconfirm >/dev/null      # fresh container: bring it current firs
 
 step "dependency resolution"
 # Everything a fresh install pulls, together (same set as the installer), then the hardware extras
-for set in "mobius-base mobius-desktop mobius-gaming" "mobius-nvidia" "intel-ucode thermald vulkan-intel lib32-vulkan-intel intel-media-driver"; do
+for set in "mobius-base mobius-desktop mobius-gaming" "mobius-nvidia" "mobius-nvidia-legacy" "intel-ucode thermald vulkan-intel lib32-vulkan-intel intel-media-driver"; do
     if out="$(pacman -Sp --print-format '%n' $set 2>&1)"; then
         echo "ok: $set ($(wc -l <<<"$out") packages)"
     else
@@ -62,6 +63,27 @@ import json, re, sys
 json.loads(re.sub(r'^\s*//.*$', '', open(sys.argv[1], encoding='utf-8').read(), flags=re.M))
 print("waybar config parses")
 PY
+
+step "NVIDIA drivers compile against linux-mobius"
+# DKMS builds the NVIDIA module on the user's machine at install time; a kernel or driver update
+# that breaks the build would leave that machine without graphics. Build both drivers here first.
+# driver:its userspace (the two userspaces conflict, so each pair is removed before the next)
+for pair in nvidia-open-dkms:nvidia-utils nvidia-580xx-dkms:nvidia-580xx-utils; do
+    drv="${pair%%:*}"; utils="${pair#*:}"
+    if ! pacman -Sp "$drv" >/dev/null 2>&1; then echo "skip: $drv not available"; continue; fi
+    pacman -S --noconfirm --needed linux-mobius-headers "$drv" >/tmp/dkms-$drv.log 2>&1 || true
+    kver="$(ls /usr/lib/modules | grep mobius | head -1 || true)"
+    st="$(dkms status 2>/dev/null | grep -E '^nvidia' || true)"
+    if grep -q "$kver.*installed" <<<"$st"; then
+        echo "ok: $drv builds for $kver"
+    else
+        bad "$drv did not build for ${kver:-linux-mobius}"
+        echo "$st"; grep -iE 'error|fail' /tmp/dkms-$drv.log | head -20 || true
+        find /var/lib/dkms -name make.log -exec tail -30 {} \; 2>/dev/null | head -60 || true
+    fi
+    pacman -Rdd --noconfirm "$drv" "$utils" >/dev/null 2>&1 || true
+    rm -rf /var/lib/dkms/nvidia
+done
 
 step "Hyprland config"
 pacman -S --noconfirm --needed hyprland >/dev/null
