@@ -12,6 +12,8 @@ TM's log has no line for the switch, so these are timed from the match start.
   tm-sounds          watch TM's log files and play sounds; TM can already be open (default)
   tm-sounds --launch start TM and read its output instead
   tm-sounds --test   play the start sound once, to check the speaker
+  --switch-only      with either mode: play only the driver-switch sounds (Warning, Warning2),
+                     e.g. when another tm-sounds is already playing the rest (or TM_SWITCH_ONLY=1)
 Log folder: TM_LOG_DIR (default ~/.VEX Tournament Manager/Logs). Text logs are followed like
 tail -f; a log that is really a SQLite database is polled for new rows.
 """
@@ -38,8 +40,11 @@ def pick_sink():
 
 SINK = pick_sink()
 last = {}
+SWITCH_ONLY = "--switch-only" in sys.argv or os.environ.get("TM_SWITCH_ONLY") == "1"
 
 def play(name):
+    if SWITCH_ONLY and name not in ("Warning", "Warning2"):
+        return
     now = time.monotonic()
     if now - last.get(name, 0) < 1.5:      # TM logs each event twice (two log formats)
         return
@@ -176,7 +181,8 @@ def watch():
     if not os.path.isdir(LOG_DIR):
         sys.exit(f"tm-sounds: no TM log folder at {LOG_DIR} (start TM once, or set TM_LOG_DIR)")
     logs = {}
-    print(f"tm-sounds: speaker = {SINK or 'default output'}; watching {LOG_DIR}", flush=True)
+    print(f"tm-sounds: speaker = {SINK or 'default output'}; watching {LOG_DIR}"
+          + ("; driver-switch sounds only" if SWITCH_ONLY else ""), flush=True)
     while True:
         for name in os.listdir(LOG_DIR):
             path = os.path.join(LOG_DIR, name)
