@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""tm-sounds: start VEX TM and play its match sounds, which TM's Linux build never plays itself.
+
+TM v2026_27 for Linux logs every field state change but never loads its sound files. This starts
+TM, reads those log lines, and plays TM's own WAV files through the desktop audio, by default on
+the motherboard's analog output (the speaker). Override with TM_SINK=<sink name> (pactl list short sinks).
+Driver-period length for the 5-second countdown: TM_DRIVER_SECONDS (default 60, VIQ; VRC is 105).
+
+  tm-sounds          start TM with sounds
+  tm-sounds --test   play the start sound once, to check the speaker
+"""
+import os, re, subprocess, sys, threading, time
+
+APP = "com.dwabtech.TM"
+SOUNDS = os.environ.get("TM_SOUNDS_DIR", f"/var/lib/flatpak/app/{APP}/current/active/files/Sounds")
+TM_CMD = os.environ.get("TM_CMD")  # testing hook: a command whose output stands in for TM's
+DRIVER = float(os.environ.get("TM_DRIVER_SECONDS", "60"))
+
+def pick_sink():
+    if os.environ.get("TM_SINK"):
+        return os.environ["TM_SINK"]
+    try:
+        out = subprocess.run(["pactl", "list", "short", "sinks"], capture_output=True, text=True).stdout
+    except OSError:
+        return None
+    for line in out.splitlines():
+        parts = line.split("\t")
+        if len(parts) > 1 and parts[1].startswith("alsa_output.pci-") and "analog" in parts[1]:
+            return parts[1]
+    return None
+
+SINK = pick_sink()
+last = {}
+
+def play(name):
+    now = time.monotonic()
+    if now - last.get(name, 0) < 1.5:      # TM logs each event twice (two log formats)
+        return
+    last[name] = now
+    path = os.path.join(SOUNDS, name + ".wav")
+    cmd = os.environ.get("TM_PLAYER")
+    if cmd:
+        args = [cmd, path]
+    else:
+        args = ["paplay", "--client-name=VEX TM Sounds"] + ([f"--device={SINK}"] if SINK else []) + [path]
+    print(f"tm-sounds: {name}", flush=True)
+    try:
+        subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e:
+        print(f"tm-sounds: cannot play {path}: {e}", flush=True)
+
+countdown = None
+def cancel_countdown():
+    global countdown
+    if countdown:
+        countdown.cancel()
+        countdown = None
+
+def arm_countdown():
+    global countdown
+    cancel_countdown()
+    if DRIVER > 5:
+        countdown = threading.Timer(DRIVER - 5, play, args=("FiveSecondCountdown",))
+        countdown.daemon = True
+        countdown.start()
+
+aborted_at = 0.0
+RULES = [
+    (re.compile(r"FC: Starting field \S+ \((AUTONOMOUS|DRIVER_CTRL)"), "start"),
+    (re.compile(r"FC: Pausing field"), "pause"),
+    (re.compile(r"MATCH_ABORTED|Abort Match"), "abort"),
+    (re.compile(r"FC: Stopping field"), "stop"),
+]
+
+def handle(line):
+    global aborted_at
+    for rx, ev in RULES:
+        m = rx.search(line)
+        if not m:
+            continue
+        if ev == "start":
+            play("Start")
+            if m.group(1) == "DRIVER_CTRL":
+                arm_countdown()
+            else:
+                cancel_countdown()
+        elif ev == "pause":
+            cancel_countdown(); play("Pause")
+        elif ev == "abort":
+            cancel_countdown(); aborted_at = time.monotonic(); play("Abort")
+        elif ev == "stop":
+            cancel_countdown()
+            if time.monotonic() - aborted_at > 2:   # a natural end, not the stop after an abort
+                play("Stop")
+        return
+
+def main():
+    if "--test" in sys.argv:
+        print(f"tm-sounds: speaker = {SINK or 'default output'}")
+        play("Start"); time.sleep(3); return
+    cmd = TM_CMD.split() if TM_CMD else ["flatpak", "run", "--env=PYTHONUNBUFFERED=1", "--command=sh", APP, "-c", "cd /app; exec ./TM"]
+    print(f"tm-sounds: speaker = {SINK or 'default output'}; starting TM", flush=True)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, errors="replace")
+    for line in p.stdout:
+        handle(line)
+    sys.exit(p.wait())
+
+if __name__ == "__main__":
+    main()
