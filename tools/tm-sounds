@@ -9,7 +9,7 @@ Driver-switch signals (VIQ teamwork), seconds after the driver period starts: TM
 (default "25,35": Warning.wav at the first, Warning2.wav at the second; "" turns them off).
 TM's log has no line for the switch, so these are timed from the match start.
 The first switch sound plays twice back to back (TM_WARNING_REPEAT, default 2).
-Fields to ignore (e.g. the skills field): TM_SKIP_FIELDS="name,name" as printed at match start.
+Fields to ignore (e.g. the skills field set): TM_SKIP_FIELDS="3" (field set) or "3,1" (one field).
 
   tm-sounds          watch TM's log files and play sounds; TM can already be open (default)
   tm-sounds --launch start TM and read its output instead
@@ -99,9 +99,12 @@ def arm_countdown(field):
     if DRIVER > 5:
         after(field, DRIVER - 5, "FiveSecondCountdown")
 
-# Fields to ignore entirely, e.g. the skills field: TM_SKIP_FIELDS="3" or "3,4"
-# (the field name as tm-sounds prints it when a match starts)
-SKIP = {x.strip().lower() for x in os.environ.get("TM_SKIP_FIELDS", "").split(",") if x.strip()}
+# Fields to ignore entirely, e.g. the skills field set. TM logs a field as "<field set>,<field>"
+# (tm-sounds prints it at each match start): TM_SKIP_FIELDS="3" skips all of field set 3,
+# "3,1" just that field; several are separated by spaces.
+SKIP = {x.lower() for x in os.environ.get("TM_SKIP_FIELDS", "").split() if x}
+def skipped(field):
+    return field in SKIP or field.split(",")[0] in SKIP
 def fieldname(tok):
     return tok.strip("()[]:,'\"").lower()
 
@@ -120,7 +123,7 @@ def handle(line):
         if not m:
             continue
         field = fieldname(m.group(1)) if m.groups() else None
-        if field is not None and field in SKIP:
+        if field is not None and skipped(field):
             return
         if ev == "start":
             print(f"tm-sounds: field {field} started ({m.group(2)})", flush=True)
