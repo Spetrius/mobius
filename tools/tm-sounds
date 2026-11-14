@@ -116,6 +116,11 @@ RULES = [
     (re.compile(r"FC: Stopping field (\S+)"), "stop"),
 ]
 
+# TM writes each event to more than one log, and the copies can arrive seconds apart. Only the
+# first copy counts: a late copy would replay the sound and restart the timers late.
+DEDUP = float(os.environ.get("TM_DEDUP_SECONDS", "5"))
+seen = {}
+
 def handle(line):
     global aborted_at
     for rx, ev in RULES:
@@ -125,6 +130,11 @@ def handle(line):
         field = fieldname(m.group(1)) if m.groups() else None
         if field is not None and skipped(field):
             return
+        key = (ev, field, m.group(2) if ev == "start" else None)
+        now = time.monotonic()
+        if now - seen.get(key, -DEDUP) < DEDUP:
+            return
+        seen[key] = now
         if ev == "start":
             print(f"tm-sounds: field {field} started ({m.group(2)})", flush=True)
             play("Start")
