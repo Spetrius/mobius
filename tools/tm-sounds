@@ -8,6 +8,7 @@ Driver-period length for the 5-second countdown: TM_DRIVER_SECONDS (default 60, 
 Driver-switch signals (VIQ teamwork), seconds after the driver period starts: TM_SWITCH_SECONDS
 (default "25,35": Warning.wav at the first, Warning2.wav at the second; "" turns them off).
 TM's log has no line for the switch, so these are timed from the match start.
+Fields to ignore (e.g. the skills field): TM_SKIP_FIELDS="name,name" as printed at match start.
 
   tm-sounds          watch TM's log files and play sounds; TM can already be open (default)
   tm-sounds --launch start TM and read its output instead
@@ -61,32 +62,39 @@ def play(name):
     except OSError as e:
         print(f"tm-sounds: cannot play {path}: {e}", flush=True)
 
-timers = []
-def cancel_countdown():
-    while timers:
-        timers.pop().cancel()
+timers = {}                                 # field -> pending timed sounds of its driver period
+def cancel_countdown(field=None):
+    for f in ([field] if field is not None else list(timers)):
+        for t in timers.pop(f, []):
+            t.cancel()
 
-def after(seconds, sound):
+def after(field, seconds, sound):
     t = threading.Timer(seconds, play, args=(sound,))
     t.daemon = True
     t.start()
-    timers.append(t)
+    timers.setdefault(field, []).append(t)
 
-def arm_countdown():
+def arm_countdown(field):
     """Timed sounds of the driver period: driver switch signals, then the 5-second countdown."""
-    cancel_countdown()
+    cancel_countdown(field)
     for i, sec in enumerate(SWITCH):
         if 0 < sec < DRIVER:
-            after(sec, "Warning" if i == 0 else "Warning2")
+            after(field, sec, "Warning" if i == 0 else "Warning2")
     if DRIVER > 5:
-        after(DRIVER - 5, "FiveSecondCountdown")
+        after(field, DRIVER - 5, "FiveSecondCountdown")
+
+# Fields to ignore entirely, e.g. the skills field: TM_SKIP_FIELDS="3" or "3,4"
+# (the field name as tm-sounds prints it when a match starts)
+SKIP = {x.strip().lower() for x in os.environ.get("TM_SKIP_FIELDS", "").split(",") if x.strip()}
+def fieldname(tok):
+    return tok.strip("()[]:,'\"").lower()
 
 aborted_at = 0.0
 RULES = [
-    (re.compile(r"FC: Starting field \S+ \((AUTONOMOUS|DRIVER_CTRL)"), "start"),
-    (re.compile(r"FC: Pausing field"), "pause"),
+    (re.compile(r"FC: Starting field (\S+) \((AUTONOMOUS|DRIVER_CTRL)"), "start"),
+    (re.compile(r"FC: Pausing field (\S+)"), "pause"),
     (re.compile(r"MATCH_ABORTED|Abort Match"), "abort"),
-    (re.compile(r"FC: Stopping field"), "stop"),
+    (re.compile(r"FC: Stopping field (\S+)"), "stop"),
 ]
 
 def handle(line):
@@ -95,18 +103,22 @@ def handle(line):
         m = rx.search(line)
         if not m:
             continue
+        field = fieldname(m.group(1)) if m.groups() else None
+        if field is not None and field in SKIP:
+            return
         if ev == "start":
+            print(f"tm-sounds: field {field} started ({m.group(2)})", flush=True)
             play("Start")
-            if m.group(1) == "DRIVER_CTRL":
-                arm_countdown()
+            if m.group(2) == "DRIVER_CTRL":
+                arm_countdown(field)
             else:
-                cancel_countdown()
+                cancel_countdown(field)
         elif ev == "pause":
-            cancel_countdown(); play("Pause")
+            cancel_countdown(field); play("Pause")
         elif ev == "abort":
             cancel_countdown(); aborted_at = time.monotonic(); play("Abort")
         elif ev == "stop":
-            cancel_countdown()
+            cancel_countdown(field)
             if time.monotonic() - aborted_at > 2:   # a natural end, not the stop after an abort
                 play("Stop")
         return
