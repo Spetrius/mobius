@@ -5,6 +5,9 @@ TM v2026_27 for Linux logs every field state change but never loads its sound fi
 TM, reads those log lines, and plays TM's own WAV files through the desktop audio, by default on
 the motherboard's analog output (the speaker). Override with TM_SINK=<sink name> (pactl list short sinks).
 Driver-period length for the 5-second countdown: TM_DRIVER_SECONDS (default 60, VIQ; VRC is 105).
+Driver-switch signals (VIQ teamwork), seconds after the driver period starts: TM_SWITCH_SECONDS
+(default "25,35": Warning.wav at the first, Warning2.wav at the second; "" turns them off).
+TM's log has no line for the switch, so these are timed from the match start.
 
   tm-sounds          start TM with sounds
   tm-sounds --test   play the start sound once, to check the speaker
@@ -15,6 +18,7 @@ APP = "com.dwabtech.TM"
 SOUNDS = os.environ.get("TM_SOUNDS_DIR", f"/var/lib/flatpak/app/{APP}/current/active/files/Sounds")
 TM_CMD = os.environ.get("TM_CMD")  # testing hook: a command whose output stands in for TM's
 DRIVER = float(os.environ.get("TM_DRIVER_SECONDS", "60"))
+SWITCH = [float(x) for x in os.environ.get("TM_SWITCH_SECONDS", "25,35").split(",") if x.strip()]
 
 def pick_sink():
     if os.environ.get("TM_SINK"):
@@ -49,20 +53,25 @@ def play(name):
     except OSError as e:
         print(f"tm-sounds: cannot play {path}: {e}", flush=True)
 
-countdown = None
+timers = []
 def cancel_countdown():
-    global countdown
-    if countdown:
-        countdown.cancel()
-        countdown = None
+    while timers:
+        timers.pop().cancel()
+
+def after(seconds, sound):
+    t = threading.Timer(seconds, play, args=(sound,))
+    t.daemon = True
+    t.start()
+    timers.append(t)
 
 def arm_countdown():
-    global countdown
+    """Timed sounds of the driver period: driver switch signals, then the 5-second countdown."""
     cancel_countdown()
+    for i, sec in enumerate(SWITCH):
+        if 0 < sec < DRIVER:
+            after(sec, "Warning" if i == 0 else "Warning2")
     if DRIVER > 5:
-        countdown = threading.Timer(DRIVER - 5, play, args=("FiveSecondCountdown",))
-        countdown.daemon = True
-        countdown.start()
+        after(DRIVER - 5, "FiveSecondCountdown")
 
 aborted_at = 0.0
 RULES = [
