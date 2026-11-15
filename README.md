@@ -21,7 +21,7 @@ Built on plain Arch Linux. No CachyOS repos. CachyOS's kernel patchset and syste
 ### Things it fixes from the old setup
 - **Boot guard.** pacman refuses to touch kernels if `/boot` isn't mounted, and after every update it checks that each kernel really landed on the EFI partition. That's the Sep 29 failure, blocked automatically.
 - **`mobius-update`** does the safe update routine for you: check `/boot`, full `-Syu`, AUR updates, verify kernels, tell you if a reboot is needed.
-- **Monitors switch themselves.** One config with both desks; it picks home (OMEN + Acer) or Dad's (MSI + LG) from the monitors it sees. Override: `mobius-monitors home`, `mobius-monitors dad`, `mobius-monitors auto`.
+- **Monitors switch themselves.** One config with both desks; it picks home (OMEN + Acer) or Dad's (Samsung + LG + MSI, workspaces 3, 1, 2 left to right) from the monitors it sees. Override: `mobius-monitors home`, `mobius-monitors dad`, `mobius-monitors auto`.
 - **Claude Desktop on monitor 2** at login (window class `com.anthropic.Claude`).
 - **Wallpaper works.** `swww` was renamed `awww`; the old `awww-daemom` line was just a typo.
 - Game and data drives (GAMES, DATA1, DATA2) are found by label and mounted with `nofail`, so a missing drive never blocks boot.
