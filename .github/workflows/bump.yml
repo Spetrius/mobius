@@ -1,6 +1,7 @@
-# Weekly: move the kernel to CachyOS's current linux-cachyos-bore and the pinned AUR packages to
-# their current commits, and open a pull request with the result. Nothing is built or published
-# until the owner merges it (the build then runs from main as usual).
+# Weekly: move the kernel to CachyOS's current linux-cachyos-bore, Claude Desktop to Anthropic's
+# newest signed release and the pinned AUR packages to their current commits, and open a pull
+# request with the result. Nothing is built or published until the owner merges it (the build
+# then runs from main as usual).
 name: bump
 
 on:
@@ -40,6 +41,14 @@ jobs:
             echo EOF
           } >> "$GITHUB_OUTPUT"
 
+      - name: Claude Desktop from Anthropic's apt repo
+        id: claude
+        run: |
+          old="$(grep -m1 '^pkgver=' packages/claude-desktop/PKGBUILD | cut -d= -f2)"
+          packages/claude-desktop/update.sh
+          new="$(grep -m1 '^pkgver=' packages/claude-desktop/PKGBUILD | cut -d= -f2)"
+          echo "summary=claude-desktop $old -> $new" >> "$GITHUB_OUTPUT"
+
       - name: Open or update the pull request
         env:
           GH_TOKEN: ${{ github.token }}
@@ -48,12 +57,12 @@ jobs:
           git config user.name "mobius-bump"
           git config user.email "mobius-bump@users.noreply.github.com"
           git checkout -B bump/weekly
-          git commit -qam "Weekly bump: ${{ steps.kernel.outputs.summary }}, AUR pins"
+          git commit -qam "Weekly bump: ${{ steps.kernel.outputs.summary }}, ${{ steps.claude.outputs.summary }}, AUR pins"
           git push -f origin bump/weekly
-          body="$(printf 'Automatic weekly bump. Merge it, then the build runs as usual.\n\n**Kernel:** %s\n\n**AUR** (click to review the upstream PKGBUILD changes):\n%s\n' \
-            "${{ steps.kernel.outputs.summary }}" "${{ steps.aur.outputs.summary }}")"
+          body="$(printf 'Automatic weekly bump. Merge it, then the build runs as usual.\n\n**Kernel:** %s\n\n**Claude Desktop:** %s\n\n**AUR** (click to review the upstream PKGBUILD changes):\n%s\n' \
+            "${{ steps.kernel.outputs.summary }}" "${{ steps.claude.outputs.summary }}" "${{ steps.aur.outputs.summary }}")"
           if gh pr view bump/weekly --json state -q .state 2>/dev/null | grep -q OPEN; then
             gh pr edit bump/weekly --body "$body"
           else
-            gh pr create --head bump/weekly --base main --title "Weekly bump: kernel and AUR packages" --body "$body"
+            gh pr create --head bump/weekly --base main --title "Weekly bump: kernel, Claude Desktop and AUR packages" --body "$body"
           fi
