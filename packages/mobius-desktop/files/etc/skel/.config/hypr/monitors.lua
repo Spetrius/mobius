@@ -12,10 +12,12 @@ local profiles = {
         { match = "ACER", mode = "3440x1440@144", position = "2560x0", scale = 1, workspace = "1" },
     },
     dad = {
-        -- MSI G273, left, main
-        { match = "MSI",       mode = "preferred", position = "0x0",    scale = 1, workspace = "1" },
+        -- Samsung S24D590 (24"), left
+        { match = "S24D590",   mode = "1920x1080@60",  position = "0x0",    scale = 1, workspace = "3" },
+        -- MSI G273, center, main
+        { match = "MSI",       mode = "1920x1080@144", position = "1920x0", scale = 1, workspace = "1" },
         -- LG ULTRAGEAR, right
-        { match = "ULTRAGEAR", mode = "preferred", position = "1920x0", scale = 1, workspace = "2" },
+        { match = "ULTRAGEAR", mode = "1920x1080@165", position = "3840x0", scale = 1, workspace = "2" },
     },
     laptop = {
         -- Legion 5i built-in 16" 2560x1600 165 Hz (eDP-2 when the BIOS MUX is set to dGPU)
