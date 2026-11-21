@@ -2,7 +2,7 @@
 # Source: https://downloads.claude.ai/claude-desktop/apt/stable (signing key 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE)
 # Bump with ./update.sh, which verifies the signed apt index before pinning the new sha256.
 pkgname=claude-desktop
-pkgver=5.11492.5
+pkgver=6.28899.2
 pkgrel=1
 pkgdesc='Claude desktop app (Chat, Cowork, Claude Code), official Anthropic Linux build'
 arch=('x86_64')
@@ -26,7 +26,7 @@ replaces=('claude-desktop-deb')
 conflicts=('claude-desktop-deb' 'claude-desktop-bin')
 options=('!strip' '!debug')
 source=("https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_${pkgver}_amd64.deb")
-sha256sums=('b96208b207e450b740f7dbe304f6077fed80e7f3d37ddd545991c4e8201564cf')
+sha256sums=('b7cbcc47a8c37cfe409eb146885b0196ffcd9b1f29be1642eb78a894d89ef6b1')
 
 package() {
   bsdtar -xf data.tar.xz -C "$pkgdir"

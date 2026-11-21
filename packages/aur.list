@@ -2,9 +2,9 @@
 # Pinned to an AUR git commit so builds are reproducible. Bump with: build/bump-aur.sh
 proton-ge-custom-bin 6ce7f4f71e20831b24d6ddac744b815dcfab37d7
 cachyos-ananicy-rules-git 8223ff76a726fbdc798232b539f8e34efcd7f365
-paru 675b2c0803072a523f2ea9f5a9372ec271b74f8d
-limine-mkinitcpio-hook 94ffde9c60808595b287edf9d4219da202a85a7a
-limine-snapper-sync b3c82aded52032687a76922f2dee9497600818f2
+paru f8bb12fcd306aef6a6a8f8790d63e729a76849c9
+limine-mkinitcpio-hook 6b3bca12270e19262ea509f0cde4cede6cf2e255
+limine-snapper-sync 71bc43c7cb59ff3b75cb53e7fe28b6a05db8bed2
 lmstudio-bin 1df25f8d4b466eca3bd1d6a94bed9f07fb70ecea
 bambustudio-bin 22976fb9566b6766e47f2456c248929a89f07851
 minecraft-launcher c6cac125f8cfc5d9a45e93b7f3ac9b01385dae23
